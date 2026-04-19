@@ -1,0 +1,102 @@
+from __future__ import annotations
+from datetime import datetime
+from pathlib import Path
+from schemas.memory import Episode, KnowledgeFact
+from bootstrap import state
+from hooks import audit
+
+_IDENTITY_DIR = Path(__file__).parent.parent / "identity"
+_MAX_EPISODES = 20
+_MAX_FACTS = 10
+
+
+def build_context(
+    session_context: list[dict],
+    episodes: list[Episode],
+    facts: list[KnowledgeFact],
+) -> list[dict]:
+    messages: list[dict] = []
+
+    # Identity always loads first — soul before anything else
+    soul = _load_identity_file("SOUL.md")
+    identity = _load_identity_file("IDENTITY.md")
+    system_content = "\n\n".join(filter(None, [soul, identity]))
+
+    now = datetime.now().astimezone()
+    user_block = _build_user_block()
+    prefix = f"Current date and time: {now.strftime('%Y-%m-%d %H:%M:%S %Z')} (today is {now.strftime('%A, %d %B %Y')})"
+    if user_block:
+        prefix += f"\n\n{user_block}"
+    system_content = prefix + "\n\n" + system_content
+
+    catalog_block = _build_catalog_block()
+    if catalog_block:
+        system_content += "\n\n" + catalog_block
+
+    if system_content:
+        messages.append({"role": "system", "content": system_content})
+
+    # Long-term knowledge injected as system context
+    if facts:
+        capped = facts[:_MAX_FACTS]
+        fact_block = "\n".join(f"- {f.content}" for f in capped)
+        messages.append({
+            "role": "system",
+            "content": f"## What I know\n{fact_block}",
+        })
+
+    # Relevant episodic memory
+    if episodes:
+        capped = episodes[:_MAX_EPISODES]
+        episode_block = "\n".join(
+            f"[{e.timestamp.strftime('%Y-%m-%d %H:%M')}] {e.role}: {e.content}"
+            for e in capped
+        )
+        messages.append({
+            "role": "system",
+            "content": f"## Relevant past context\n{episode_block}",
+        })
+
+    # Hot session context
+    messages.extend(session_context)
+
+    audit.log_allow(
+        "context_gate",
+        reason=f"assembled context: {len(messages)} blocks, {len(session_context)} session turns",
+    )
+    return messages
+
+
+def _load_identity_file(filename: str) -> str | None:
+    path = _IDENTITY_DIR / filename
+    if path.exists():
+        return path.read_text(encoding="utf-8").strip()
+    return None
+
+
+def _build_user_block() -> str | None:
+    from bootstrap import state
+    user_cfg = state.get_config().get("user", {})
+    if not user_cfg:
+        return None
+    lines = ["## User Profile"]
+    for k, v in user_cfg.items():
+        lines.append(f"- {k}: {v}")
+    return "\n".join(lines)
+
+
+def _build_catalog_block() -> str | None:
+    """List available catalog agents so Thrall knows when to delegate."""
+    try:
+        from components.agents.utils import list_agents
+        agents = list_agents()
+    except Exception:
+        return None
+
+    if not agents:
+        return None
+
+    lines = ["## Available Catalog Agents", "Delegate to one of these specialised agents when the user's request matches their purpose. Spawn with `agents.spawn profile=<name> brief=<task>`."]
+    for a in agents:
+        lines.append(f"- **{a.name}**: {a.description}")
+    return "\n".join(lines)

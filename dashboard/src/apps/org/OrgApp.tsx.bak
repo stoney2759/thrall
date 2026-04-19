@@ -1,0 +1,95 @@
+import React, { useState, useCallback, useEffect } from "react";
+import { OrgTreePanel } from "../../components/OrgTreePanel";
+import { NodeDetailSidebar } from "../../components/NodeDetailSidebar";
+import { PlaceholderView } from "../../components/PlaceholderView";
+import { useAppStore } from "../../state/store";
+import { listNodes } from "../../api/client";
+import type { NodeDTO } from "../../api/types";
+
+interface Props { activeView: string; }
+
+function HierarchyView() {
+  const store = useAppStore();
+  const [selectedNode, setSelectedNode] = useState<NodeDTO | null>(null);
+
+  const refresh = useCallback(async () => {
+    const r = await listNodes();
+    if (r.ok) store.setOrgNodes(r.data.nodes);
+  }, [store]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  return (
+    <div className="org-layout">
+      <div className="org-tree-wrap">
+        <OrgTreePanel
+          nodes={store.orgNodes}
+          selectedNodeId={selectedNode?.id ?? null}
+          onSelectNode={setSelectedNode}
+        />
+      </div>
+      {selectedNode && (
+        <div className="org-detail-wrap">
+          <NodeDetailSidebar node={selectedNode} onClose={() => setSelectedNode(null)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NodesView() {
+  const store = useAppStore();
+
+  const refresh = useCallback(async () => {
+    const r = await listNodes();
+    if (r.ok) store.setOrgNodes(r.data.nodes);
+  }, [store]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  return (
+    <div className="nodes-table-view">
+      <div className="view-header">
+        <span className="view-title">ALL NODES</span>
+        <span className="view-count">{store.orgNodes.length} total</span>
+        <button className="btn-ghost btn-sm" onClick={refresh}>↻ Refresh</button>
+      </div>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>NAME</th>
+            <th>TYPE</th>
+            <th>ROLE</th>
+            <th>PARENT</th>
+            <th>STATUS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {store.orgNodes.map((node) => (
+            <tr key={node.id}>
+              <td className="td-primary">{node.name}</td>
+              <td><span className={`node-badge node-${node.type.toLowerCase()}`}>{node.type}</span></td>
+              <td className="td-dim">{node.role_title || "—"}</td>
+              <td className="td-mono td-dim">{node.parent_id ? node.parent_id.slice(0, 12) + "…" : "—"}</td>
+              <td>
+                <span className={node.enabled !== false ? "status-enabled" : "status-disabled"}>
+                  {node.enabled !== false ? "ENABLED" : "DISABLED"}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function OrgApp({ activeView }: Props) {
+  switch (activeView) {
+    case "hierarchy": return <HierarchyView />;
+    case "nodes":     return <NodesView />;
+    case "workspace": return <PlaceholderView app="Org" view="Workspace" message="Workspace file management coming soon." />;
+    case "policies":  return <PlaceholderView app="Org" view="Policies" message="Policy management coming soon." />;
+    default:          return <HierarchyView />;
+  }
+}
