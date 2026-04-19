@@ -1,0 +1,123 @@
+// ============================================================
+// OrgTreePanel.tsx
+//
+// Renders the org hierarchy as a visual tree.
+// Source: orgNodes from app store (populated from GET /org + GET /nodes).
+// No mutations. Read-only display panel.
+// ============================================================
+
+import React, { useMemo } from "react";
+import type { NodeDTO } from "../api/types";
+
+const NODE_TYPE_LABELS: Record<string, string> = {
+  HUMAN: "HUMAN",
+  COO: "THRALL",
+  CHIEF: "CHIEF",
+  DEPARTMENT: "DEPT",
+  AGENT: "AGENT",
+};
+
+const NODE_TYPE_CLASS: Record<string, string> = {
+  HUMAN: "node-human",
+  COO: "node-coo",
+  CHIEF: "node-chief",
+  DEPARTMENT: "node-dept",
+  AGENT: "node-agent",
+};
+
+interface TreeNode extends NodeDTO {
+  children: TreeNode[];
+}
+
+function buildTree(nodes: NodeDTO[]): TreeNode[] {
+  const map = new Map<string, TreeNode>();
+  nodes.forEach((n) => map.set(n.id, { ...n, children: [] }));
+
+  const roots: TreeNode[] = [];
+  map.forEach((node) => {
+    if (node.parent_id && map.has(node.parent_id)) {
+      map.get(node.parent_id)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+  return roots;
+}
+
+function NodeRow({
+  node,
+  depth,
+  onSelect,
+  selectedId,
+}: {
+  node: TreeNode;
+  depth: number;
+  onSelect: (n: NodeDTO) => void;
+  selectedId: string | null;
+}) {
+  const typeLabel = NODE_TYPE_LABELS[node.type] ?? node.type;
+  const typeClass = NODE_TYPE_CLASS[node.type] ?? "node-default";
+  const isSelected = node.id === selectedId;
+
+  return (
+    <>
+      <div
+        className={`tree-row ${isSelected ? "selected" : ""}`}
+        style={{ paddingLeft: `${16 + depth * 24}px` }}
+        onClick={() => onSelect(node)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && onSelect(node)}
+      >
+        {depth > 0 && <span className="tree-connector">└─</span>}
+        <span className={`node-badge ${typeClass}`}>{typeLabel}</span>
+        <span className="node-name">{node.name}</span>
+        {node.role_title && <span className="node-role">{node.role_title}</span>}
+        {!node.enabled && <span className="node-disabled-tag">DISABLED</span>}
+      </div>
+      {node.children.map((child) => (
+        <NodeRow
+          key={child.id}
+          node={child}
+          depth={depth + 1}
+          onSelect={onSelect}
+          selectedId={selectedId}
+        />
+      ))}
+    </>
+  );
+}
+
+interface OrgTreePanelProps {
+  nodes: NodeDTO[];
+  selectedNodeId: string | null;
+  onSelectNode: (node: NodeDTO) => void;
+}
+
+export function OrgTreePanel({ nodes, selectedNodeId, onSelectNode }: OrgTreePanelProps) {
+  const tree = useMemo(() => buildTree(nodes), [nodes]);
+
+  return (
+    <div className="panel org-tree-panel">
+      <div className="panel-header">
+        <span className="panel-title">ORG HIERARCHY</span>
+        <span className="panel-count">{nodes.length} NODES</span>
+      </div>
+      <div className="panel-body tree-body">
+        {tree.length === 0 ? (
+          <div className="empty-state">No nodes loaded.</div>
+        ) : (
+          tree.map((root) => (
+            <NodeRow
+              key={root.id}
+              node={root}
+              depth={0}
+              onSelect={onSelectNode}
+              selectedId={selectedNodeId}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

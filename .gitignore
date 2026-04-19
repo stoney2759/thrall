@@ -1,0 +1,33 @@
+# Secrets — never commit these
+.env
+config/config.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Runtime data
+workspace/
+state/
+memory/
+logs/
+*.log
+
+# Dev artifacts
+THRALL2_STATE.md
+
+# Frontend
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.vite/
+
+# OS
+.DS_Store
+Thumbs.db

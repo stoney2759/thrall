@@ -1,0 +1,186 @@
+// ============================================================
+// client.ts — Centralized fetch wrapper for OpenThrall API
+//
+// BASE_URL: defaults to same-origin "".
+// Override via VITE_API_BASE_URL env var for dev server setups.
+//
+// Rules:
+// - Never swallows backend errors.
+// - Always surfaces HTTP 4xx/5xx as ApiResult { ok: false }.
+// - Never hardcodes payload shapes (all types from types.ts).
+// ============================================================
+
+import type {
+  ApiResult,
+  CreateHumanRequest,
+  CreateHumanResponse,
+  GetOrgResponse,
+  ListNodesResponse,
+  ThrallChatRequest,
+  ThrallChatResponse,
+  ListApprovalsResponse,
+  ApproveRequest,
+  DenyRequest,
+  ApprovalDecisionResponse,
+  ListEventsResponse,
+  HealthResponse,
+  LlmHealthResponse,
+  SendMessageRequest,
+  SendMessageResponse,
+  FetchInboxRequest,
+  FetchInboxResponse,
+  LoadContextRequest,
+  LoadContextResponse,
+  AddChiefRequest,
+  AddChiefResponse,
+  AddDepartmentRequest,
+  AddDepartmentResponse,
+  AddAgentRequest,
+  AddAgentResponse,
+  LlmGenerateRequest,
+  LlmGenerateResponse,
+  DeleteNodeResponse,
+  ResetOrgRequest,
+  ResetOrgResponse,
+  HTTPValidationError,
+} from "./types";
+
+const BASE_URL: string =
+  (typeof import.meta !== "undefined" &&
+    (import.meta as { env?: { VITE_API_BASE_URL?: string } }).env
+      ?.VITE_API_BASE_URL) ||
+  "";
+
+async function request<T>(
+  method: "GET" | "POST" | "DELETE",
+  path: string,
+  body?: unknown
+): Promise<ApiResult<T>> {
+  const url = `${BASE_URL}${path}`;
+  const init: RequestInit = {
+    method,
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+  };
+  if (body !== undefined) {
+    init.body = JSON.stringify(body);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      error: `Network error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  let json: unknown;
+  try {
+    json = await response.json();
+  } catch {
+    return {
+      ok: false,
+      status: response.status,
+      error: `Non-JSON response (HTTP ${response.status})`,
+    };
+  }
+
+  if (!response.ok) {
+    // Surface FastAPI validation errors clearly
+    const ve = json as HTTPValidationError;
+    const errorMsg =
+      ve?.detail
+        ?.map((d) => `${d.loc.join(".")}: ${d.msg}`)
+        .join("; ") ?? `HTTP ${response.status}`;
+    return {
+      ok: false,
+      status: response.status,
+      error: errorMsg,
+      detail: ve?.detail,
+    };
+  }
+
+  return { ok: true, data: json as T };
+}
+
+// ── Health ─────────────────────────────────────────────────
+
+export const getHealth = () => request<HealthResponse>("GET", "/health");
+export const getLlmHealth = () =>
+  request<LlmHealthResponse>("GET", "/llm/health");
+
+// ── Bootstrap / Org ────────────────────────────────────────
+
+export const bootstrapOrg = (body: CreateHumanRequest) =>
+  request<CreateHumanResponse>("POST", "/org/bootstrap", body);
+
+export const getOrg = () => request<GetOrgResponse>("GET", "/org");
+
+export const listNodes = () =>
+  request<ListNodesResponse>("GET", "/nodes");
+
+// ── Thrall Chat ────────────────────────────────────────────
+
+export const thrallChat = (body: ThrallChatRequest) =>
+  request<ThrallChatResponse>("POST", "/thrall/chat", body);
+
+// ── Approvals ──────────────────────────────────────────────
+
+export const listPendingApprovals = () =>
+  request<ListApprovalsResponse>("GET", "/approvals/pending");
+
+export const approveRequest = (body: ApproveRequest) =>
+  request<ApprovalDecisionResponse>("POST", "/approvals/approve", body);
+
+export const denyRequest = (body: DenyRequest) =>
+  request<ApprovalDecisionResponse>("POST", "/approvals/deny", body);
+
+// ── Events ─────────────────────────────────────────────────
+
+export const listEvents = () =>
+  request<ListEventsResponse>("GET", "/events");
+
+// ── Messages ───────────────────────────────────────────────
+
+export const sendMessage = (body: SendMessageRequest) =>
+  request<SendMessageResponse>("POST", "/messages/send", body);
+
+export const fetchInbox = (body: FetchInboxRequest) =>
+  request<FetchInboxResponse>("POST", "/messages/inbox", body);
+
+// ── Context ────────────────────────────────────────────────
+
+export const loadContext = (body: LoadContextRequest) =>
+  request<LoadContextResponse>("POST", "/context/load", body);
+
+// ── Org Hierarchy Mutation ─────────────────────────────────
+
+export const addChief = (body: AddChiefRequest) =>
+  request<AddChiefResponse>("POST", "/chiefs", body);
+
+export const addDepartment = (body: AddDepartmentRequest) =>
+  request<AddDepartmentResponse>("POST", "/departments", body);
+
+export const addAgent = (body: AddAgentRequest) =>
+  request<AddAgentResponse>("POST", "/agents", body);
+
+// ── LLM Direct ────────────────────────────────────────────
+
+export const llmGenerate = (body: LlmGenerateRequest) =>
+  request<LlmGenerateResponse>("POST", "/llm/generate", body);
+
+// ── Delete / Reset (v0.2.10) ───────────────────────────────
+
+export const deleteNode = (
+  nodeId: string,
+  cascade: boolean = false
+) =>
+  request<DeleteNodeResponse>(
+    "DELETE",
+    `/nodes/${encodeURIComponent(nodeId)}?cascade=${cascade}`
+  );
+
+export const resetOrg = (body: ResetOrgRequest) =>
+  request<ResetOrgResponse>("POST", "/org/reset", body);

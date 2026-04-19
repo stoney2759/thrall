@@ -1,0 +1,258 @@
+// ============================================================
+// types.ts — Generated from OpenThrall OpenAPI schema v0.2.8
+// DO NOT hand-edit payload shapes. Source of truth: /openapi.json
+// ============================================================
+
+// ── Core DTOs ──────────────────────────────────────────────
+
+export interface NodeDTO {
+  id: string;
+  type: string;
+  name: string;
+  role_title?: string;
+  description?: string;
+  parent_id?: string | null;
+  enabled?: boolean;
+}
+
+export interface OrgDTO {
+  nodes: NodeDTO[];
+}
+
+export interface ApprovalDTO {
+  id: string;
+  created_at: string;       // ISO datetime
+  status: string;           // "PENDING" | "APPROVED" | "DENIED"
+  decided_by_node_id?: string | null;
+  actor_id?: string | null;
+  reason?: string;
+  kind?: string;
+  summary?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface EventDTO {
+  id: string;
+  ts: string;               // ISO datetime
+  event_type: string;
+  actor_node_id: string;
+  subject_node_id: string;
+  message: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface MessageDTO {
+  message_id: string;
+  timestamp: string;
+  from_node_id: string;
+  to_node_id: string;
+  type: string;
+  priority: string;
+  subject: string;
+  body: string;
+}
+
+export interface ContextItemDTO {
+  file: string;
+  chars: number;
+  preview?: string;
+}
+
+// ── Request / Response pairs ───────────────────────────────
+
+// Health
+export interface HealthResponse {
+  ok: boolean;
+  project_root: string;
+  config_path: string;
+}
+
+export interface LlmHealthResponse {
+  ok: boolean;
+  configured: boolean;
+  provider?: string;
+  default_model?: string;
+}
+
+// Bootstrap
+export interface CreateHumanRequest {
+  name: string;
+  description?: string;
+}
+
+export interface CreateHumanResponse {
+  human: NodeDTO;
+  coo: NodeDTO;
+  org: OrgDTO;
+}
+
+// Nodes
+export interface ListNodesResponse {
+  nodes: NodeDTO[];
+}
+
+// Org — returns CreateHumanResponse or empty object before bootstrap
+export type GetOrgResponse = CreateHumanResponse | Record<string, never>;
+
+// Thrall Chat
+export interface ThrallChatRequest {
+  human_node_id: string;
+  thrall_node_id: string;
+  prompt: string;
+  use_llm?: boolean;
+  model?: string | null;
+  system_instructions?: string | null;
+  task_id?: string | null;
+  notes?: string;
+}
+
+export interface ThrallChatResponse {
+  ok: boolean;
+  used_llm: boolean;
+  reply_text: string;
+  response_id?: string;
+  provider?: string;
+  model_used?: string;
+  usage?: Record<string, unknown>;
+  messages?: Record<string, unknown>;
+}
+
+// Approvals
+export interface ListApprovalsResponse {
+  approvals: ApprovalDTO[];
+}
+
+export interface ApproveRequest {
+  approval_id: string;
+  decided_by_node_id: string;
+  actor_id: string;
+  apply_immediately?: boolean;
+}
+
+export interface DenyRequest {
+  approval_id: string;
+  decided_by_node_id: string;
+  actor_id: string;
+  reason?: string;
+}
+
+export interface ApprovalDecisionResponse {
+  ok?: boolean;
+  approval_id: string;
+  applied?: boolean;
+  message?: string;
+}
+
+// Events
+export interface ListEventsResponse {
+  events: EventDTO[];
+}
+
+// Messages
+export interface SendMessageRequest {
+  from_node_id: string;
+  to_node_id: string;
+  subject: string;
+  body: string;
+  msg_type?: string;
+  priority?: string;
+}
+
+export interface SendMessageResponse {
+  message: MessageDTO;
+}
+
+export interface FetchInboxRequest {
+  node_id: string;
+  limit?: number;
+}
+
+export interface FetchInboxResponse {
+  messages: MessageDTO[];
+}
+
+// Context
+export interface LoadContextRequest {
+  node_id: string;
+  scope: string;
+}
+
+export interface LoadContextResponse {
+  node_id: string;
+  scope: string;
+  total_chars?: number;
+  items: ContextItemDTO[];
+  summary?: string;
+}
+
+// Chiefs / Departments / Agents
+export interface AddChiefRequest {
+  name: string;
+  role_title: string;
+  description?: string;
+}
+
+export interface AddChiefResponse {
+  chief: NodeDTO;
+  org: OrgDTO;
+}
+
+export interface AddDepartmentRequest {
+  chief_id: string;
+  name: string;
+  description?: string;
+}
+
+export interface AddDepartmentResponse {
+  department: NodeDTO;
+  org: OrgDTO;
+}
+
+export interface AddAgentRequest {
+  parent_id: string;
+  name: string;
+  role_title?: string;
+  description?: string;
+}
+
+export interface AddAgentResponse {
+  agent: NodeDTO;
+  org: OrgDTO;
+}
+
+// LLM
+export interface LlmGenerateRequest {
+  node_id: string;
+  prompt: string;
+  system_instructions?: string | null;
+  model?: string | null;
+  task_id?: string | null;
+  notes?: string;
+}
+
+export interface LlmGenerateResponse {
+  text: string;
+  provider: string;
+  model_used: string;
+  response_id?: string;
+  usage: Record<string, unknown>;
+}
+
+// Validation error (FastAPI standard)
+export interface ValidationError {
+  loc: (string | number)[];
+  msg: string;
+  type: string;
+  input?: unknown;
+  ctx?: Record<string, unknown>;
+}
+
+export interface HTTPValidationError {
+  detail?: ValidationError[];
+}
+
+// ── API Result wrapper ─────────────────────────────────────
+
+export type ApiResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; status: number; error: string; detail?: ValidationError[] };

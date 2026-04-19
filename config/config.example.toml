@@ -1,0 +1,116 @@
+[thrall]
+name = "Thrall"
+version = "2.0.0"
+workspace_dir = "workspace"
+
+[user]
+github_username = "your-github-username"
+
+
+[llm]
+provider = "openrouter"
+model = "google/gemini-2.5-flash"
+temperature = 0.7
+max_tokens = 8192
+# reasoning_effort = "high"   # "low" | "medium" | "high" — enables reasoning/thinking for supported models
+
+[llm.providers.openrouter]
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+
+[llm.providers.openai]
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+
+[llm.providers.anthropic]
+api_key_env = "ANTHROPIC_API_KEY"
+
+[llm.providers.google]
+api_key_env = "GOOGLE_API_KEY"
+
+[memory]
+backend = "session"          # active: session | redis | postgres | qdrant
+episodes_max = 1000
+knowledge_max = 5000
+session_max_tokens = 32000
+
+[memory.redis]
+url = "redis://localhost:6379"
+ttl_seconds = 86400          # 24h episode TTL
+
+[memory.postgres]
+url = "postgresql://localhost/thrall"
+
+[memory.qdrant]
+url = "http://localhost:6333"
+collection_facts = "facts"
+collection_episodes = "episodes"
+
+[transports.telegram]
+enabled = true
+allowed_user_ids = [YOUR_TELEGRAM_USER_ID]
+
+[transports.cli]
+enabled = true
+
+[transports.discord]
+enabled = false
+
+[transports.slack]
+enabled = false
+
+[security]
+sanitize_web_content = true
+sanitize_file_content = true
+audit_log = true
+
+[server]
+host = "0.0.0.0"
+port = 8000
+
+# ── MCP Servers ───────────────────────────────────────────────────────────────
+# Any MCP-compatible server can be added here.
+# Set enabled = true and fill credentials to activate.
+
+[mcp]
+enabled = true
+
+[[mcp.servers]]
+name = "gmail"
+transport = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-gmail"]
+env = {}
+enabled = false
+
+[[mcp.servers]]
+name = "google-calendar"
+transport = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-google-calendar"]
+env = {}
+enabled = false
+
+[[mcp.servers]]
+name = "github"
+transport = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+env = {}
+enabled = false
+
+[[mcp.servers]]
+name = "google-drive"
+transport = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-gdrive"]
+env = {}
+enabled = false
+
+[[mcp.servers]]
+name = "brave-search"
+transport = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-brave-search"]
+env = { BRAVE_API_KEY = "" }
+enabled = false

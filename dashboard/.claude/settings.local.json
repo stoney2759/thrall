@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"useEffect\\\\|setInterval\\\\|setTimeout\\\\|useQuery\\\\|useSWR\" 'C:\\\\Users\\\\jared\\\\Coding Folder\\\\OpenThrall\\\\dashboard/src' --include=*.tsx --include=*.ts)"
+    ]
+  }
+}
