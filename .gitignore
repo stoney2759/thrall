@@ -16,7 +16,7 @@ build/
 # Runtime data
 workspace/
 state/
-memory/
+/memory/
 logs/
 *.log
 
@@ -27,6 +27,9 @@ THRALL2_STATE.md
 dashboard/node_modules/
 dashboard/dist/
 dashboard/.vite/
+
+# Claude Code local settings
+.claude/
 
 # OS
 .DS_Store

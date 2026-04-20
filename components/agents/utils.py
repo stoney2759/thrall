@@ -39,6 +39,11 @@ def list_agent_names() -> list[str]:
     return [a.name for a in list_agents()]
 
 
+def find_incomplete_agents() -> list[AgentDefinition]:
+    """Return catalog agents that have no tools assigned — need inference before use."""
+    return [a for a in list_agents() if not a.allowed_tools]
+
+
 def delete_agent(name: str) -> bool:
     path = _catalog_path(name)
     if path.exists():
@@ -84,10 +89,27 @@ def _from_toml(text: str) -> AgentDefinition:
     if dev_instructions:
         soul = soul + "\n\n" + dev_instructions
 
+    model = _get("model")
+    if model:
+        # Strip the -spark sub-variant suffix — it's not a real OpenRouter model variant.
+        # Keeps "-codex" intact since openai/gpt-5.x-codex models are real on OpenRouter.
+        import re as _re
+        model = _re.sub(r"-spark$", "", model)
+        # If no provider prefix, prepend openai/ — covers gpt-5.x-codex → openai/gpt-5.x-codex
+        if "/" not in model:
+            model = f"openai/{model}"
+        # Final safety net — if model still looks non-standard, fall back to tier_capable
+        if "/" not in model:
+            try:
+                from bootstrap import state
+                model = state.get_config().get("agents", {}).get("tier_capable", "google/gemini-2.5-flash")
+            except Exception:
+                model = "google/gemini-2.5-flash"
+
     return AgentDefinition(
         name=_get("name"),
         description=_get("description"),
-        model=_get("model"),
+        model=model,
         created_at=_get("created_at"),
         allowed_tools=_get_list("allowed_tools"),
         soul=soul,

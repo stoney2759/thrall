@@ -29,22 +29,25 @@ api_key_env = "ANTHROPIC_API_KEY"
 api_key_env = "GOOGLE_API_KEY"
 
 [memory]
-backend = "session"          # active: session | redis | postgres | qdrant
-episodes_max = 1000
-knowledge_max = 5000
-session_max_tokens = 32000
+episode_backend = "session"        # session | redis
+fact_backend = "session"           # session | qdrant
+auto_compact_threshold = 200000    # tokens — 0 to disable auto-compact
+episodic_ttl_days = 7              # how long episodes live in Redis
+synthesis_interval = "6h"         # how often episodic → semantic synthesis runs
 
 [memory.redis]
 url = "redis://localhost:6379"
-ttl_seconds = 86400          # 24h episode TTL
-
-[memory.postgres]
-url = "postgresql://localhost/thrall"
 
 [memory.qdrant]
 url = "http://localhost:6333"
-collection_facts = "facts"
-collection_episodes = "episodes"
+
+# ── Agent model tiers ─────────────────────────────────────────────────────────
+# Models assigned to generated agents by task complexity.
+# tier_capable   — research, code execution, analysis, multi-step reasoning
+# tier_lightweight — summarisation, formatting, simple classification
+[agents]
+tier_capable     = "google/gemini-2.5-flash"
+tier_lightweight = "google/gemini-2.0-flash-lite"
 
 [transports.telegram]
 enabled = true
@@ -52,6 +55,11 @@ allowed_user_ids = [YOUR_TELEGRAM_USER_ID]
 
 [transports.cli]
 enabled = true
+
+[transports.desktop]
+enabled = true
+# Set THRALL_DESKTOP_TOKEN env var to require token auth on the /ws endpoint.
+# Leave unset for open access (dev mode only — always set a token in production).
 
 [transports.discord]
 enabled = false

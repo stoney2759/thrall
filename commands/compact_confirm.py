@@ -15,5 +15,5 @@ class CompactConfirmCommand(Command):
         if not compactor.get_pending(ctx.session_id):
             return "No pending compact. Run /compact first."
 
-        original_count = compactor.commit(ctx.session_id)
+        original_count = await compactor.commit(ctx.session_id)
         return f"Memory compacted. {original_count} turns replaced with summary. session_backup.md updated."

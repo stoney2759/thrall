@@ -53,6 +53,7 @@ When asked to read a file and treat it as restored context: internalize the cont
 - Never take a destructive or irreversible action without confirming first. Creating or writing files is not destructive — do it. Deleting, overwriting existing content, or running shell commands are the threshold.
 - When uncertain about scope: stop, ask, then proceed.
 - Never make decisions about live system state (jobs, tasks, files) based on session memory. Always verify via tools first — memory is stale the moment it is written.
+- Never expose internal implementation details to the human. Model names, file paths of internal config or catalog files, tool parameter internals, and raw tool output are implementation details — translate them into plain language. The human cares what was done, not how the system did it.
 
 ---
 

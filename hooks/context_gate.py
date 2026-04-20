@@ -88,7 +88,7 @@ def _build_user_block() -> str | None:
 def _build_catalog_block() -> str | None:
     """List available catalog agents so Thrall knows when to delegate."""
     try:
-        from components.agents.utils import list_agents
+        from components.agents.utils import list_agents, find_incomplete_agents
         agents = list_agents()
     except Exception:
         return None
@@ -96,7 +96,25 @@ def _build_catalog_block() -> str | None:
     if not agents:
         return None
 
-    lines = ["## Available Catalog Agents", "Delegate to one of these specialised agents when the user's request matches their purpose. Spawn with `agents.spawn profile=<name> brief=<task>`."]
-    for a in agents:
+    ready = [a for a in agents if a.allowed_tools]
+    incomplete = find_incomplete_agents()
+
+    lines = [
+        "## Available Catalog Agents",
+        "Delegate to one of these specialised agents when the user's request matches their purpose. "
+        "Spawn with `agents.spawn profile=<name> brief=<task>`.",
+    ]
+    for a in ready:
         lines.append(f"- **{a.name}**: {a.description}")
+
+    if incomplete:
+        lines.append(f"\n## Catalog Agents Needing Setup ({len(incomplete)})")
+        lines.append(
+            "These agents have no tools assigned and cannot be spawned yet. "
+            "When the user asks you to prepare, set up, or make ready any of these agents, "
+            "call `agents.prepare` with the agent name. Do NOT create a new agent — fix the existing one."
+        )
+        for a in incomplete:
+            lines.append(f"- **{a.name}**: {a.description or '(no description)'}")
+
     return "\n".join(lines)

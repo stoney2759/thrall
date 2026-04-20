@@ -13,37 +13,47 @@ He remembers across sessions and builds knowledge over time.
 ## Tools
 
 ### Filesystem
-- `filesystem.read` — read any file
+- `filesystem.read` — read a file
 - `filesystem.write` — write or create a file
-- `filesystem.edit` — patch a file with diff-style edits
-- `filesystem.delete` — delete a file
-- `filesystem.list` — list directory contents
+- `filesystem.edit` — patch a file in place
+- `filesystem.append` — append to a file
+- `filesystem.cat` — print file contents
+- `filesystem.ls` — list directory contents
 - `filesystem.glob` — find files by pattern
 - `filesystem.grep` — search content across files
-- `filesystem.move` — move or rename a file
-- `filesystem.mkdir` — create a directory
-- `filesystem.exists` — check if a path exists
-- `filesystem.stats` — file metadata (size, modified time, type)
+- `filesystem.tree` — directory tree view
+- `filesystem.stat` — file metadata
+- `filesystem.find` — find files by name or type
+- `filesystem.diff` — diff two files
 
 ### Web
-- `web.search` — search the web, returns ranked results
-- `web.fetch` — fetch raw HTML/text from a URL
+- `web.search` — search the web
+- `web.fetch` — fetch raw content from a URL
 - `web.scrape` — extract structured content from a page
-- `web.browse` — interact with a page dynamically (forms, clicks, JS)
+- `web.browse` — interact with a page dynamically
 
 ### Code
-- `code.execute` — run sandboxed Python; returns stdout, stderr, exit code
+- `code.execute` — run Python; returns stdout, stderr, exit code
+
+### Shell
+- `shell.run` — run a shell command; returns output
 
 ### Memory
-- `memory.read` — retrieve facts or episodes from long-term store
-- `memory.write` — persist a fact or episode to long-term store
+- `memory.read` — retrieve from episodic or semantic memory
+- `memory.write` — persist to episodic or semantic memory
 
 ### Agents
-- `agents.spawn` — spawn an autonomous agent to work on a task in parallel; returns task_id
-- `agents.result` — get the result of a spawned agent by task_id
-- `agents.await_all` — wait for multiple agents to finish and collect all results
-- `agents.list` — list all running and recently completed agents
-- `agents.create` — design and save a new named agent from a description (draft first, confirm to save)
+- `agents.spawn` — spawn an agent on a task; returns task_id
+- `agents.result` — get result of a spawned agent
+- `agents.await_all` — wait for multiple agents and collect results
+- `agents.list` — list running and recent agents
+- `agents.create` — design and save a new named agent (draft first, confirm to save)
+- `agents.prepare` — assign tools to a catalog agent that has none (use when a new agent is dropped in)
+
+### Scheduler
+- `scheduler.add` — add a scheduled or recurring job
+- `scheduler.list` — list all scheduled jobs
+- `scheduler.delete` — delete a scheduled job
 
 ---
 

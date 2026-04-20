@@ -1,0 +1,56 @@
+services:
+
+  thrall:
+    build: .
+    container_name: thrall
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./config/config.toml:/app/config/config.toml:ro
+      - ./workspace:/app/workspace
+      - ./memory:/app/memory
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    environment:
+      # Override memory backends to use the real services when running in Docker
+      THRALL_EPISODE_BACKEND: redis
+      THRALL_FACT_BACKEND: qdrant
+
+  redis:
+    image: redis:7-alpine
+    container_name: thrall-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: thrall-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis_data:
+  qdrant_data:

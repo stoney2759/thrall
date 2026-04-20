@@ -18,6 +18,10 @@ google-generativeai
 # Async
 asyncio
 
+# Memory backends
+redis[asyncio]
+qdrant-client
+
 # Utilities
 python-dotenv
 tomli

@@ -99,19 +99,32 @@ async def _fire_job(job: Job) -> None:
         await _push(f"[{job.type.upper()}] Job `{job.id}` failed: {e}")
 
 
+_task: asyncio.Task | None = None
+
+
 async def _run_loop() -> None:
-    while True:
-        await asyncio.sleep(_POLL_INTERVAL)
-        now = datetime.now().astimezone()
-        try:
-            jobs = store.load_jobs()
-            for job in jobs:
-                if _should_fire(job, now):
-                    asyncio.create_task(_fire_job(job))
-        except Exception as e:
-            state.log_error(f"Scheduler runner error: {e}")
+    try:
+        while True:
+            await asyncio.sleep(_POLL_INTERVAL)
+            now = datetime.now().astimezone()
+            try:
+                jobs = store.load_jobs()
+                for job in jobs:
+                    if _should_fire(job, now):
+                        asyncio.create_task(_fire_job(job))
+            except Exception as e:
+                state.log_error(f"Scheduler runner error: {e}")
+    except asyncio.CancelledError:
+        pass
 
 
 def start(bot) -> None:
+    global _task
     set_bot(bot)
-    asyncio.get_event_loop().create_task(_run_loop())
+    _task = asyncio.get_event_loop().create_task(_run_loop())
+
+
+def stop() -> None:
+    global _task
+    if _task and not _task.done():
+        _task.cancel()

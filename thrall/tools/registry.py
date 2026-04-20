@@ -9,7 +9,7 @@ from thrall.tools.filesystem import read, write, edit, append, glob, grep, cat, 
 from thrall.tools.web import fetch, search, scrape, browse
 from thrall.tools.code import execute as code_execute
 from thrall.tools.memory import read as mem_read, write as mem_write
-from thrall.tools.agents import spawn, result as agent_result, await_all, list as agent_list, create as agent_create
+from thrall.tools.agents import spawn, result as agent_result, await_all, list as agent_list, create as agent_create, prepare as agent_prepare
 from thrall.tools.shell import run as shell_run
 from thrall.tools.scheduler import add as sched_add, list as sched_list, delete as sched_delete
 
@@ -40,6 +40,7 @@ _TOOLS: dict = {
     await_all.NAME: await_all.execute,
     agent_list.NAME: agent_list.execute,
     agent_create.NAME: agent_create.execute,
+    agent_prepare.NAME: agent_prepare.execute,
     shell_run.NAME: shell_run.execute,
     sched_add.NAME: sched_add.execute,
     sched_list.NAME: sched_list.execute,
@@ -71,6 +72,7 @@ _SCHEMAS: dict = {
     await_all.NAME: (await_all.DESCRIPTION, await_all.PARAMETERS),
     agent_list.NAME: (agent_list.DESCRIPTION, agent_list.PARAMETERS),
     agent_create.NAME: (agent_create.DESCRIPTION, agent_create.PARAMETERS),
+    agent_prepare.NAME: (agent_prepare.DESCRIPTION, agent_prepare.PARAMETERS),
     shell_run.NAME: (shell_run.DESCRIPTION, shell_run.PARAMETERS),
     sched_add.NAME: (sched_add.DESCRIPTION, sched_add.PARAMETERS),
     sched_list.NAME: (sched_list.DESCRIPTION, sched_list.PARAMETERS),
