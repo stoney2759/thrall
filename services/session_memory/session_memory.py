@@ -29,3 +29,9 @@ def clear(session_id: UUID) -> None:
 
 def all_sessions() -> list[UUID]:
     return list(_sessions.keys())
+
+
+def estimate_tokens(session_id: UUID) -> int:
+    """Rough token estimate for the session context (4 chars ≈ 1 token)."""
+    context = get_or_create(session_id).context
+    return sum(len(str(msg.get("content", ""))) for msg in context) // 4

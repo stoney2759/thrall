@@ -31,6 +31,9 @@ async def receive(message: Message) -> str:
     # Add user turn to session memory
     session_memory.append(clean_message.session_id, clean_message.role, clean_message.content)
 
+    # Auto-compact if session context is approaching the token threshold
+    _auto_compact_note = await _maybe_auto_compact(clean_message.session_id)
+
     # Write episode to memory store
     store = await get_store()
     await store.write_episode(Episode(
@@ -54,6 +57,8 @@ async def receive(message: Message) -> str:
         return "I wasn't able to generate a safe response. Please try again."
 
     final = out.content
+    if _auto_compact_note:
+        final = f"{_auto_compact_note}\n\n{final}"
 
     # Persist assistant response
     session_memory.append(clean_message.session_id, Role.ASSISTANT, final)
@@ -113,6 +118,27 @@ async def _reason(
     })
     fallback = await llm.complete(messages)
     return fallback
+
+
+async def _maybe_auto_compact(session_id) -> str | None:
+    """Fire auto-compact if session token estimate exceeds configured threshold."""
+    threshold = state.get_config().get("memory", {}).get("auto_compact_threshold", 0)
+    if not threshold:
+        return None
+    estimate = session_memory.estimate_tokens(session_id)
+    if estimate < threshold:
+        return None
+
+    from services.compaction import compactor
+    try:
+        await compactor.raw_dump(session_id)
+        draft = await compactor.summarise(session_id)
+        cleaned, _ = await compactor.validate(draft)
+        original_count = await compactor.commit_auto(session_id, cleaned)
+        return f"_[Auto-compact: {original_count} turns condensed at ~{estimate // 1000}k tokens. Raw dump saved to workspace.]_"
+    except Exception as e:
+        state.log_error(f"Auto-compact failed: {e}")
+        return None
 
 
 def _assistant_message(response: LLMResponse) -> dict:

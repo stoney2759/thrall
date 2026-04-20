@@ -4,13 +4,20 @@ import tomllib
 from pathlib import Path
 from bootstrap import state
 
+_started = False
+
 
 def start() -> None:
+    global _started
+    if _started:
+        return
+    _started = True
     _load_env()
     config = _load_config()
     state.set_config(config)
     state.set_cwd(str(Path.cwd()))
     _init_workspace(config)
+    _scan_catalog()
 
 
 def reload() -> None:
@@ -49,6 +56,19 @@ def _load_config() -> dict:
     config_path = Path(__file__).parent.parent / "config" / "config.toml"
     with open(config_path, "rb") as f:
         return tomllib.load(f)
+
+
+def _scan_catalog() -> None:
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        from components.agents.utils import find_incomplete_agents
+        incomplete = find_incomplete_agents()
+        if incomplete:
+            names = ", ".join(a.name for a in incomplete)
+            logger.warning(f"Catalog: {len(incomplete)} agent(s) have no tools assigned: {names}")
+    except Exception:
+        pass
 
 
 def get_llm_config() -> dict:

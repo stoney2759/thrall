@@ -516,9 +516,15 @@ async def set_commands(app: Application) -> None:
             pass
 
 
+async def _shutdown(app) -> None:
+    from scheduler import runner
+    runner.stop()
+
+
 def run() -> None:
     app = build_application()
     app.post_init = set_commands
+    app.post_shutdown = _shutdown
     app.run_polling(
         allowed_updates=Update.ALL_TYPES,
         drop_pending_updates=True,

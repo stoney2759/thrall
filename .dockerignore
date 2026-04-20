@@ -1,0 +1,36 @@
+# Secrets — never bake into image
+.env
+config/config.toml
+
+# Python runtime artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+*.egg-info/
+
+# Runtime data — these are mounted as volumes
+workspace/
+memory/
+state/
+logs/
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Dev artifacts
+THRALL2_STATE.md
+thrall.log
+
+# Frontend (not part of the backend image)
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.vite/
+frontend/
+
+# Docs
+docs/
