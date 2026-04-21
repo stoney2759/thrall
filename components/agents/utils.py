@@ -98,13 +98,6 @@ def _from_toml(text: str) -> AgentDefinition:
         # If no provider prefix, prepend openai/ — covers gpt-5.x-codex → openai/gpt-5.x-codex
         if "/" not in model:
             model = f"openai/{model}"
-        # Final safety net — if model still looks non-standard, fall back to tier_capable
-        if "/" not in model:
-            try:
-                from bootstrap import state
-                model = state.get_config().get("agents", {}).get("tier_capable", "google/gemini-2.5-flash")
-            except Exception:
-                model = "google/gemini-2.5-flash"
 
     return AgentDefinition(
         name=_get("name"),
