@@ -51,6 +51,9 @@ class _State:
     # Default working directory for relative filesystem paths
     workspace_dir: str = ""
 
+    # Identity file baseline: filename → (content, sha256_hash) — set once at startup
+    identity_baseline: dict[str, tuple[str, str]] = field(default_factory=dict)
+
 
 _STATE = _State()
 
@@ -174,6 +177,15 @@ def log_error(error: str) -> None:
 
 def get_error_log() -> list[dict]:
     return _STATE.error_log
+
+
+# ── Identity baseline ─────────────────────────────────────────────────────────
+
+def set_identity_baseline(filename: str, content: str, hash_: str) -> None:
+    _STATE.identity_baseline[filename] = (content, hash_)
+
+def get_identity_baseline(filename: str) -> tuple[str, str] | None:
+    return _STATE.identity_baseline.get(filename)
 
 
 # ── Interaction time ──────────────────────────────────────────────────────────
