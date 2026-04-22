@@ -3,6 +3,7 @@ import os
 from typing import AsyncIterator
 import httpx
 from interfaces.llm import LLMProvider
+from services.llm._retry import post_with_retry
 
 
 class AnthropicProvider(LLMProvider):
@@ -48,12 +49,10 @@ class AnthropicProvider(LLMProvider):
             body["system"] = system
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{self._base_url}/messages",
-                headers=self._headers(),
-                json=body,
+            response = await post_with_retry(
+                client, f"{self._base_url}/messages",
+                headers=self._headers(), json=body, provider="anthropic",
             )
-            response.raise_for_status()
             return response.json()["content"][0]["text"]
 
     async def stream(
