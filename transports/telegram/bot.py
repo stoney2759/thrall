@@ -465,14 +465,14 @@ async def _register_task_delivery(app: Application) -> None:
 
     async def _deliver(task) -> None:
         from schemas.task import TaskStatus
-        if task.status == TaskStatus.DONE and task.result:
-            text = f"Agent task complete:\n\n{task.result}"
-            # Save exchange so the next user reply continues the conversation
-            if task.profile and task.profile.name and task.profile.name != "default":
+        if task.status == TaskStatus.DONE:
+            result = task.result or "(agent completed but returned no output)"
+            text = f"Agent task complete:\n\n{result}"
+            if task.result and task.profile and task.profile.name and task.profile.name != "default":
                 from thrall.tasks.continuation_store import save
                 save(task.profile.name, task.brief, task.result)
-        elif task.status == TaskStatus.FAILED and task.error:
-            text = f"Agent task failed:\n\n{task.error}"
+        elif task.status == TaskStatus.FAILED:
+            text = f"Agent task failed:\n\n{task.error or '(no error details)'}"
         else:
             return
         for uid in allowed:
