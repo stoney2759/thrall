@@ -13,13 +13,19 @@ def _load_raw() -> list[dict]:
         return []
     try:
         return json.loads(_JOBS_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        import logging
+        logging.getLogger(__name__).error(f"Jobs file corrupted at {_JOBS_PATH} — starting with empty job list")
+        return []
     except Exception:
         return []
 
 
 def _save_raw(jobs: list[dict]) -> None:
     _JOBS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _JOBS_PATH.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp = _JOBS_PATH.with_suffix(".tmp")
+    tmp.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(_JOBS_PATH)  # atomic rename — original preserved if write fails
 
 
 def load_jobs() -> list[Job]:
