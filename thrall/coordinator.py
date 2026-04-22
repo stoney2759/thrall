@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import logging
 from datetime import datetime, timezone
 from schemas.message import Message, Role
 from schemas.tool import ToolCall
@@ -12,6 +13,8 @@ from thrall import context
 from thrall.tools import registry as tools
 from hooks import input_gate, output_gate, tool_gate, audit
 from bootstrap import state
+
+logger = logging.getLogger(__name__)
 
 _MAX_TOOL_ITERATIONS = 10
 
@@ -49,7 +52,13 @@ async def receive(message: Message) -> str:
     tool_defs = tools.get_definitions()
 
     # Agentic reasoning loop
-    response = await _reason(ctx_messages, tool_defs, clean_message)
+    try:
+        response = await _reason(ctx_messages, tool_defs, clean_message)
+    except Exception as e:
+        logger.error(f"Reasoning failed for session {clean_message.session_id}: {e}", exc_info=True)
+        state.log_error(f"Coordinator reasoning failed: {e}")
+        audit.log_deny("coordinator", reason=f"reasoning failed: {type(e).__name__}: {e}")
+        return "I encountered an error processing your request. Please try again."
 
     # Gate 5 — output validation
     out = output_gate.run(response)
@@ -137,6 +146,7 @@ async def _maybe_auto_compact(session_id) -> str | None:
         original_count = await compactor.commit_auto(session_id, cleaned)
         return f"_[Auto-compact: {original_count} turns condensed at ~{estimate // 1000}k tokens. Raw dump saved to workspace.]_"
     except Exception as e:
+        logger.warning(f"Auto-compact failed for session {session_id}: {e}", exc_info=True)
         state.log_error(f"Auto-compact failed: {e}")
         return None
 

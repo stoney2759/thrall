@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import json
+import logging
 from datetime import datetime, timezone
 from schemas.task import Task, TaskStatus
 from schemas.tool import ToolCall
@@ -8,6 +9,8 @@ from interfaces.task import BaseTask
 from services.llm import client as llm
 from hooks import tool_gate
 from bootstrap import state
+
+logger = logging.getLogger(__name__)
 
 _MAX_ITERATIONS = 8
 
@@ -69,7 +72,11 @@ class LocalTask(BaseTask):
             if self._cancelled:
                 return "cancelled"
 
-            llm_response = await llm.complete_with_tools(messages, tool_defs)
+            try:
+                llm_response = await llm.complete_with_tools(messages, tool_defs)
+            except Exception as e:
+                logger.error(f"Agent {self.task.id} LLM call failed at iteration {_}: {e}", exc_info=True)
+                raise
 
             if llm_response.is_final:
                 return llm_response.content or ""

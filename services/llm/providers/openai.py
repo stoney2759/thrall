@@ -3,6 +3,7 @@ import os
 from typing import AsyncIterator
 import httpx
 from interfaces.llm import LLMProvider
+from services.llm._retry import post_with_retry
 
 
 class OpenAIProvider(LLMProvider):
@@ -27,17 +28,12 @@ class OpenAIProvider(LLMProvider):
         max_tokens: int,
     ) -> str:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{self._base_url}/chat/completions",
+            response = await post_with_retry(
+                client, f"{self._base_url}/chat/completions",
                 headers=self._headers(),
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                },
+                json={"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens},
+                provider="openai",
             )
-            response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
 
     async def stream(

@@ -54,8 +54,13 @@ def _load_env() -> None:
 
 def _load_config() -> dict:
     config_path = Path(__file__).parent.parent / "config" / "config.toml"
-    with open(config_path, "rb") as f:
-        return tomllib.load(f)
+    if not config_path.exists():
+        raise RuntimeError(f"Config file not found: {config_path} — cannot start Thrall.")
+    try:
+        with open(config_path, "rb") as f:
+            return tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        raise RuntimeError(f"Config file is invalid TOML: {e}") from e
 
 
 def _scan_catalog() -> None:
@@ -67,8 +72,8 @@ def _scan_catalog() -> None:
         if incomplete:
             names = ", ".join(a.name for a in incomplete)
             logger.warning(f"Catalog: {len(incomplete)} agent(s) have no tools assigned: {names}")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Catalog scan failed: {e}")
 
 
 def get_llm_config() -> dict:
