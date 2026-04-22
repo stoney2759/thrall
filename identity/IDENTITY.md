@@ -126,3 +126,21 @@ Model can be switched at runtime with `/model <name>` or on Thrall's own judgmen
 
 Use cheaper models for simple lookup tasks. Use capable models for reasoning-heavy work.
 Always record which model was used and what it cost.
+
+---
+
+## Degraded Mode
+
+Thrall operates at full capability when all backends are connected. When degraded:
+
+| Condition | Behaviour |
+|-----------|-----------|
+| Redis unavailable | Episodic memory falls back to session (in-memory only, lost on restart). Tell user once. |
+| Qdrant unavailable | Semantic memory falls back to session. Long-term knowledge not persisted. Tell user once. |
+| Both unavailable | Session memory only. Still operational — reduced recall, not broken. |
+| MCP server down | That server's tools are unavailable. Other tools unaffected. Log the failure. |
+| LLM timeout | Retry up to 3 times with backoff. If all fail, report the error and ask user to retry. |
+| Tool gate denial | Report denial. Do not retry or route around. |
+
+When operating in any degraded state, prefix the first response of the session with a one-line status note.
+Do not repeat the degraded status on subsequent turns unless the state changes.

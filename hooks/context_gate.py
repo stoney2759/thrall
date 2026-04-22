@@ -1,9 +1,13 @@
 from __future__ import annotations
+import hashlib
+import logging
 from datetime import datetime
 from pathlib import Path
 from schemas.memory import Episode, KnowledgeFact
 from bootstrap import state
 from hooks import audit
+
+logger = logging.getLogger(__name__)
 
 _IDENTITY_DIR = Path(__file__).parent.parent / "identity"
 _MAX_EPISODES = 20
@@ -69,9 +73,22 @@ def build_context(
 
 def _load_identity_file(filename: str) -> str | None:
     path = _IDENTITY_DIR / filename
-    if path.exists():
-        return path.read_text(encoding="utf-8").strip()
-    return None
+    if not path.exists():
+        return None
+
+    content = path.read_text(encoding="utf-8").strip()
+    current_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    baseline = state.get_identity_baseline(filename)
+
+    if baseline is not None:
+        baseline_content, baseline_hash = baseline
+        if current_hash != baseline_hash:
+            logger.warning(f"Identity file {filename} modified since startup — using trusted startup version")
+            audit.log_deny("context_gate", reason=f"identity file tampered: {filename} — falling back to startup baseline")
+            state.log_error(f"Identity tamper detected: {filename}")
+            return baseline_content.strip()
+
+    return content
 
 
 def _build_user_block() -> str | None:

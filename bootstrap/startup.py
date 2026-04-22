@@ -17,6 +17,7 @@ def start() -> None:
     state.set_config(config)
     state.set_cwd(str(Path.cwd()))
     _init_workspace(config)
+    _hash_identity_files()
     _scan_catalog()
 
 
@@ -61,6 +62,17 @@ def _load_config() -> dict:
             return tomllib.load(f)
     except tomllib.TOMLDecodeError as e:
         raise RuntimeError(f"Config file is invalid TOML: {e}") from e
+
+
+def _hash_identity_files() -> None:
+    import hashlib
+    identity_dir = Path(__file__).parent.parent / "identity"
+    for filename in ("SOUL.md", "IDENTITY.md", "RULES.md"):
+        path = identity_dir / filename
+        if path.exists():
+            content = path.read_text(encoding="utf-8")
+            hash_ = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            state.set_identity_baseline(filename, content, hash_)
 
 
 def _scan_catalog() -> None:
