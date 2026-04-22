@@ -14,7 +14,8 @@ _completion_callbacks: list[Callable[[Task], Awaitable[None]]] = []
 
 
 def register_completion_callback(fn: Callable[[Task], Awaitable[None]]) -> None:
-    _completion_callbacks.append(fn)
+    if fn not in _completion_callbacks:
+        _completion_callbacks.append(fn)
 
 
 async def submit(task: Task) -> BaseTask:

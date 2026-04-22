@@ -1,6 +1,6 @@
 name = "summariser"
 description = "Use this agent when you need long content condensed into a clear, structured summary — e.g. when you have a long document, conversation log, report, or file that needs to be distilled into its key points without losing critical information."
-model = "google/gemini-2.0-flash-lite"
+model = "google/gemini-2.5-flash"
 created_at = "2026-04-20T00:00:00+00:00"
 allowed_tools = ["filesystem.read", "filesystem.write", "memory.read"]
 
