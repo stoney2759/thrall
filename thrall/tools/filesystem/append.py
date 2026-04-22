@@ -1,7 +1,7 @@
 from __future__ import annotations
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
-from thrall.tools.filesystem._resolve import resolve
+from thrall.tools.filesystem._resolve import resolve, is_protected
 import time
 
 
@@ -12,6 +12,8 @@ def execute(call: ToolCall) -> ToolResult:
     newline = call.args.get("newline", True)
 
     try:
+        if is_protected(path):
+            return _result(call.id, error=f"path not found: {path}", start=start)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as f:
             if newline and path.stat().st_size > 0 if path.exists() else False:

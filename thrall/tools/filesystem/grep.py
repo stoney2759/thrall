@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
-from thrall.tools.filesystem._resolve import resolve
+from thrall.tools.filesystem._resolve import resolve, is_protected
 import time
 
 
@@ -21,7 +21,7 @@ def execute(call: ToolCall) -> ToolResult:
         results: list[str] = []
 
         for path in root.glob(glob_filter):
-            if not path.is_file():
+            if not path.is_file() or is_protected(path):
                 continue
             try:
                 lines = path.read_text(encoding="utf-8", errors="replace").splitlines()

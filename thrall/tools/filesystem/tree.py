@@ -2,7 +2,7 @@ from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
-from thrall.tools.filesystem._resolve import resolve
+from thrall.tools.filesystem._resolve import resolve, is_protected
 
 _MAX_ENTRIES = 500
 
@@ -38,6 +38,7 @@ def _walk(path: Path, prefix: str, max_depth: int, depth: int, hidden: bool, lin
         return
 
     visible = [e for e in entries if hidden or not e.name.startswith(".")]
+    visible = [e for e in visible if not is_protected(e)]
     for i, entry in enumerate(visible):
         if count[0] >= _MAX_ENTRIES:
             break

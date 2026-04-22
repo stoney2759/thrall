@@ -3,7 +3,7 @@ import difflib
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
-from thrall.tools.filesystem._resolve import resolve
+from thrall.tools.filesystem._resolve import resolve, is_protected
 
 
 def execute(call: ToolCall) -> ToolResult:
@@ -16,8 +16,11 @@ def execute(call: ToolCall) -> ToolResult:
 
     try:
         if path_a and path_b:
-            a_lines = resolve(path_a).read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
-            b_lines = resolve(path_b).read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+            resolved_a, resolved_b = resolve(path_a), resolve(path_b)
+            if is_protected(resolved_a) or is_protected(resolved_b):
+                return _result(call.id, error="file not found", start=start)
+            a_lines = resolved_a.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+            b_lines = resolved_b.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
             label_a, label_b = path_a, path_b
         elif text_a and text_b:
             a_lines = (text_a + "\n").splitlines(keepends=True)

@@ -2,7 +2,7 @@ from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
-from thrall.tools.filesystem._resolve import resolve
+from thrall.tools.filesystem._resolve import resolve, filter_protected
 
 
 def execute(call: ToolCall) -> ToolResult:
@@ -16,7 +16,7 @@ def execute(call: ToolCall) -> ToolResult:
         if not path.is_dir():
             return _result(call.id, error=f"not a directory: {path}", start=start)
 
-        entries = sorted(path.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+        entries = filter_protected(sorted(path.iterdir(), key=lambda p: (p.is_file(), p.name.lower())))
         lines = []
         for entry in entries:
             if not show_hidden and entry.name.startswith("."):
