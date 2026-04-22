@@ -30,6 +30,7 @@ dashboard/.vite/
 
 # Claude Code local settings
 .claude/
+CLAUDE.md
 
 # OS
 .DS_Store
