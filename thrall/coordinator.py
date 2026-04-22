@@ -39,11 +39,15 @@ async def receive(message: Message) -> str:
 
     # Write episode to memory store
     store = await get_store()
-    await store.write_episode(Episode(
-        session_id=clean_message.session_id,
-        role=clean_message.role.value,
-        content=clean_message.content,
-    ))
+    try:
+        await store.write_episode(Episode(
+            session_id=clean_message.session_id,
+            role=clean_message.role.value,
+            content=clean_message.content,
+        ))
+    except Exception as e:
+        logger.warning(f"User episode write failed for session {clean_message.session_id}: {e}")
+        audit.log_deny("memory_gate", reason=f"user episode write failed: {type(e).__name__}")
 
     # Assemble context for this turn
     ctx_messages = await context.assemble(clean_message)
@@ -71,11 +75,15 @@ async def receive(message: Message) -> str:
 
     # Persist assistant response
     session_memory.append(clean_message.session_id, Role.ASSISTANT, final)
-    await store.write_episode(Episode(
-        session_id=clean_message.session_id,
-        role=Role.ASSISTANT.value,
-        content=final,
-    ))
+    try:
+        await store.write_episode(Episode(
+            session_id=clean_message.session_id,
+            role=Role.ASSISTANT.value,
+            content=final,
+        ))
+    except Exception as e:
+        logger.warning(f"Assistant episode write failed for session {clean_message.session_id}: {e}")
+        audit.log_deny("memory_gate", reason=f"assistant episode write failed: {type(e).__name__}")
 
     return final
 
