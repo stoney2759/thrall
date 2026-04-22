@@ -3,7 +3,7 @@ import re
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
-from thrall.tools.filesystem._resolve import resolve
+from thrall.tools.filesystem._resolve import resolve, is_protected
 
 _MAX_RESULTS = 200
 
@@ -40,7 +40,8 @@ def execute(call: ToolCall) -> ToolResult:
                         continue
                     if max_size is not None and size > max_size:
                         continue
-                results.append(str(entry))
+                if not is_protected(entry):
+                    results.append(str(entry))
             except (PermissionError, OSError):
                 continue
 

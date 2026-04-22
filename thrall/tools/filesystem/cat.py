@@ -3,7 +3,7 @@ import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
 from hooks.input_gate import sanitize_external
-from thrall.tools.filesystem._resolve import resolve
+from thrall.tools.filesystem._resolve import resolve, is_protected
 
 
 def execute(call: ToolCall) -> ToolResult:
@@ -11,7 +11,7 @@ def execute(call: ToolCall) -> ToolResult:
     path = resolve(call.args.get("path", ""))
 
     try:
-        if not path.exists():
+        if is_protected(path) or not path.exists():
             return _result(call.id, error=f"not found: {path}", start=start)
         if not path.is_file():
             return _result(call.id, error=f"not a file: {path}", start=start)

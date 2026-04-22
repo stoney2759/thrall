@@ -1,7 +1,7 @@
 from __future__ import annotations
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
-from thrall.tools.filesystem._resolve import resolve
+from thrall.tools.filesystem._resolve import resolve, is_protected, filter_protected
 import time
 
 
@@ -12,7 +12,7 @@ def execute(call: ToolCall) -> ToolResult:
     limit = call.args.get("limit", 500)
 
     try:
-        matches = sorted(root.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
+        matches = filter_protected(sorted(root.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True))
         paths = [str(p) for p in matches[:limit]]
         output = "\n".join(paths) if paths else "no matches"
         return _result(call.id, output=output, start=start)

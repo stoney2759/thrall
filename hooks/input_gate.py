@@ -1,9 +1,38 @@
 from __future__ import annotations
 import re
+import time
+import threading
 from dataclasses import dataclass
 from schemas.message import Message, Transport
 from services.auth import auth
 from hooks import audit
+
+_rate_lock = threading.Lock()
+_rate_tracker: dict[str, tuple[float, int]] = {}  # user_id -> (window_start, count)
+_RATE_WINDOW = 60.0
+
+
+def _is_rate_limited(user_id: str) -> bool:
+    try:
+        from bootstrap import state
+        limit = state.get_config().get("security", {}).get("rate_limit_per_minute", 30)
+    except Exception:
+        limit = 30
+    if limit == 0:
+        return False
+    now = time.monotonic()
+    with _rate_lock:
+        if user_id not in _rate_tracker:
+            _rate_tracker[user_id] = (now, 1)
+            return False
+        window_start, count = _rate_tracker[user_id]
+        if now - window_start >= _RATE_WINDOW:
+            _rate_tracker[user_id] = (now, 1)
+            return False
+        if count >= limit:
+            return True
+        _rate_tracker[user_id] = (window_start, count + 1)
+        return False
 
 # Patterns that suggest prompt injection attempts from external content
 _INJECTION_PATTERNS: list[re.Pattern] = [
@@ -32,7 +61,12 @@ def run(message: Message) -> InputResult:
         audit.log_deny("input_gate", reason=f"unauthorised user: {message.user_id}")
         return InputResult(allowed=False, content=message.content, reason="unauthorised")
 
-    # Gate 2: sanitize
+    # Gate 2: rate limit
+    if _is_rate_limited(str(message.user_id)):
+        audit.log_deny("input_gate", reason=f"rate limit exceeded: {message.user_id}")
+        return InputResult(allowed=False, content=message.content, reason="rate limit exceeded")
+
+    # Gate 3: sanitize
     cleaned, injections_found = _sanitize(message.content)
     if injections_found:
         audit.log_deny(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
-from thrall.tools.filesystem._resolve import resolve
+from thrall.tools.filesystem._resolve import resolve, is_protected
 import time
 
 
@@ -13,7 +13,7 @@ def execute(call: ToolCall) -> ToolResult:
     replace_all = call.args.get("replace_all", False)
 
     try:
-        if not path.exists():
+        if is_protected(path) or not path.exists():
             return _result(call.id, error=f"file not found: {path}", start=start)
 
         content = path.read_text(encoding="utf-8")
