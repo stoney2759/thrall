@@ -12,6 +12,8 @@ from thrall.tools.memory import read as mem_read, write as mem_write
 from thrall.tools.agents import spawn, result as agent_result, await_all, list as agent_list, create as agent_create, prepare as agent_prepare
 from thrall.tools.shell import run as shell_run
 from thrall.tools.scheduler import add as sched_add, list as sched_list, delete as sched_delete
+from thrall.tools.git import run as git_run
+from thrall.tools.audit_hook import before_call, after_call
 
 # ── Registry ──────────────────────────────────────────────────────────────────
 
@@ -45,6 +47,7 @@ _TOOLS: dict = {
     sched_add.NAME: sched_add.execute,
     sched_list.NAME: sched_list.execute,
     sched_delete.NAME: sched_delete.execute,
+    git_run.NAME: git_run.execute,
 }
 
 _SCHEMAS: dict = {
@@ -77,6 +80,7 @@ _SCHEMAS: dict = {
     sched_add.NAME: (sched_add.DESCRIPTION, sched_add.PARAMETERS),
     sched_list.NAME: (sched_list.DESCRIPTION, sched_list.PARAMETERS),
     sched_delete.NAME: (sched_delete.DESCRIPTION, sched_delete.PARAMETERS),
+    git_run.NAME: (git_run.DESCRIPTION, git_run.PARAMETERS),
 }
 
 
@@ -142,10 +146,14 @@ async def execute(name: str, args: dict, session_id: UUID, caller: str) -> ToolR
         return ToolResult(call_id=uuid4(), error=f"unknown tool: {name}", duration_ms=0)
 
     call = ToolCall(session_id=session_id, name=name, args=args, caller=caller)
+    before_call(name, args, caller, session_id)
     fn = _TOOLS[name]
     if inspect.iscoroutinefunction(fn):
-        return await fn(call)
-    return await asyncio.to_thread(fn, call)
+        result = await fn(call)
+    else:
+        result = await asyncio.to_thread(fn, call)
+    after_call(name, result.duration_ms, result.error)
+    return result
 
 
 def list_tools() -> list[str]:

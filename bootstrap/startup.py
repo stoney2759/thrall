@@ -70,7 +70,7 @@ def _hash_identity_files() -> None:
     for filename in ("SOUL.md", "IDENTITY.md", "RULES.md"):
         path = identity_dir / filename
         if path.exists():
-            content = path.read_text(encoding="utf-8")
+            content = path.read_text(encoding="utf-8").strip()
             hash_ = hashlib.sha256(content.encode("utf-8")).hexdigest()
             state.set_identity_baseline(filename, content, hash_)
 
