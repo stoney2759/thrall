@@ -319,7 +319,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         mime = getattr(voice, "mime_type", "") or ""
         ext = ".ogg" if "ogg" in mime else ".mp4" if "mp4" in mime or "mpeg" in mime else ".ogg"
 
-        from services.transcription.groq import transcribe
+        from services.transcription.router import transcribe
         transcript = await transcribe(bytes(audio_bytes), filename=f"audio{ext}")
 
         if not transcript:

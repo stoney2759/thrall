@@ -2,11 +2,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from hooks import audit
+from bootstrap import state
 
 # Patterns that suggest accidental secret exposure
 _SECRET_PATTERNS: list[re.Pattern] = [
-    re.compile(r"sk-[a-zA-Z0-9]{20,}", re.IGNORECASE),                          # OpenAI keys
-    re.compile(r"sk-or-[a-zA-Z0-9]{20,}", re.IGNORECASE),                       # OpenRouter keys
+    re.compile(r"sk-[a-zA-Z0-9_\-]{20,}", re.IGNORECASE),                        # OpenAI keys (incl. sk-proj-)
+    re.compile(r"sk-or-[a-zA-Z0-9_\-]{20,}", re.IGNORECASE),                    # OpenRouter keys (incl. sk-or-v1-)
+    re.compile(r"gsk_[a-zA-Z0-9]{40,}"),                                         # Groq keys
     re.compile(r"sk-ant-api\d{2}-[a-zA-Z0-9_\-]{90,}", re.IGNORECASE),          # Anthropic keys
     re.compile(r"AIza[0-9A-Za-z\-_]{35}", re.IGNORECASE),                       # Google API keys
     re.compile(r"[a-zA-Z0-9]{32}:[a-zA-Z0-9_\-]{32}", re.IGNORECASE),           # Generic token pairs
@@ -48,11 +50,29 @@ def run(content: str) -> OutputResult:
     return OutputResult(allowed=True, content=cleaned)
 
 
+def _get_display_mode() -> str:
+    cfg = state.get_config()
+    return cfg.get("security", {}).get("secret_display", "mask")
+
+
+def _mask_secret(match: re.Match) -> str:
+    s = match.group(0)
+    if len(s) < 12:
+        return "[REDACTED]"
+    return s[:6] + "*...*" + s[-4:]
+
+
 def _scrub_secrets(content: str) -> tuple[str, bool]:
+    mode = _get_display_mode()
     found = False
     cleaned = content
     for pattern in _SECRET_PATTERNS:
         if pattern.search(cleaned):
             found = True
-            cleaned = pattern.sub("[SECRET REDACTED]", cleaned)
+            if mode == "redact":
+                cleaned = pattern.sub("[SECRET REDACTED]", cleaned)
+            elif mode == "off":
+                pass
+            else:
+                cleaned = pattern.sub(_mask_secret, cleaned)
     return cleaned, found
