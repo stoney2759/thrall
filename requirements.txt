@@ -25,3 +25,8 @@ qdrant-client
 # Utilities
 python-dotenv
 tomli
+pywin32
+pyperclip
+psutil
+pdfplumber
+python-docx

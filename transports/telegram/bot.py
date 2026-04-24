@@ -273,6 +273,61 @@ async def cmd_cost(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
+# ── Voice mode state ──────────────────────────────────────────────────────────
+
+_voice_mode: set[int] = set()  # user IDs with voice mode enabled
+
+_SPEAK_TRIGGERS = (
+    "say it", "say that", "read that", "read it", "speak", "tell me",
+    "read aloud", "say aloud", "speak that", "out loud", "voice that",
+)
+
+
+def _wants_audio(text: str) -> bool:
+    t = text.lower()
+    return any(trigger in t for trigger in _SPEAK_TRIGGERS)
+
+
+async def _send_audio(update: Update, text: str) -> None:
+    import io
+    try:
+        from services.tts.router import synthesise, needs_approval, cost_summary
+        from transports.telegram.audio import SEND_AS_VOICE, OUTPUT_FORMAT
+
+        if needs_approval(text):
+            await update.message.reply_text(
+                f"Audio generation requires approval:\n{cost_summary(text)}\n\nSay 'yes, generate audio' to confirm."
+            )
+            return
+
+        audio_bytes = await synthesise(text, output_format=OUTPUT_FORMAT)
+        audio_file = io.BytesIO(audio_bytes)
+        audio_file.name = "response.ogg"
+
+        if SEND_AS_VOICE:
+            await update.message.reply_voice(voice=audio_file)
+        else:
+            await update.message.reply_document(document=audio_file, filename="thrall_response.ogg")
+
+    except Exception as e:
+        state.log_error(f"TTS delivery error: {e}")
+        await update.message.reply_text(f"{text}\n\n⚠️ Voice failed: {e}")
+
+
+# ── Commands for voice mode ───────────────────────────────────────────────────
+
+async def cmd_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_allowed(update):
+        return
+    uid = update.effective_user.id
+    if uid in _voice_mode:
+        _voice_mode.discard(uid)
+        await update.message.reply_text("Voice mode off.")
+    else:
+        _voice_mode.add(uid)
+        await update.message.reply_text("Voice mode on — responses will be spoken.")
+
+
 # ── Message handler ───────────────────────────────────────────────────────────
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -283,14 +338,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("Unauthorised. Your user ID is not on the allowlist.")
         return
 
-    # Show typing indicator
     await update.message.chat.send_action(ChatAction.TYPING)
 
     message = _build_message(update)
+    user_text = update.message.text or ""
+    uid = update.effective_user.id
 
     try:
         response = await receive(message)
-        await _send(update, response)
+        use_audio = uid in _voice_mode or _wants_audio(user_text)
+        if use_audio:
+            await _send_audio(update, response)
+        else:
+            await _send(update, response)
     except Exception as e:
         import traceback
         state.log_error(f"Telegram handler error: {e}\n{traceback.format_exc()}")
@@ -336,11 +396,78 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             user_id=str(update.effective_user.id),
         )
         response = await receive(message)
-        await _send(update, response)
+        # Voice in → voice out always
+        await _send_audio(update, response)
 
     except Exception as e:
         state.log_error(f"Voice handler error: {e}")
         await update.message.reply_text(f"Voice transcription failed: {e}")
+
+
+# ── Document handler ──────────────────────────────────────────────────────────
+
+def _uploads_dir():
+    from pathlib import Path
+    workspace = state.get_workspace_dir() or "."
+    d = Path(workspace) / "uploads"
+    d.mkdir(exist_ok=True)
+    return d
+
+
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
+    if not _is_allowed(update):
+        await update.message.reply_text("Unauthorised.")
+        return
+
+    doc = update.message.document
+    if not doc:
+        return
+
+    mime = doc.mime_type or ""
+    filename = doc.file_name or "file"
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+
+    supported = ext in ("pdf", "docx", "txt") or "pdf" in mime or "wordprocessingml" in mime or "text/plain" in mime
+    if not supported:
+        await update.message.reply_text(f"Unsupported file type: {mime or filename}\nSupported: pdf, docx, txt")
+        return
+
+    await update.message.chat.send_action(ChatAction.TYPING)
+
+    try:
+        tg_file = await context.bot.get_file(doc.file_id)
+        file_bytes = await tg_file.download_as_bytearray()
+
+        save_path = _uploads_dir() / filename
+        if save_path.exists():
+            stem, suffix = save_path.stem, save_path.suffix
+            counter = 1
+            while save_path.exists():
+                save_path = _uploads_dir() / f"{stem}_{counter}{suffix}"
+                counter += 1
+
+        save_path.write_bytes(bytes(file_bytes))
+
+        caption = (update.message.caption or "").strip()
+        lines = [f"[Uploaded file: {filename}]", f"Path: {save_path}"]
+        if caption:
+            lines.append(f"User note: {caption}")
+
+        message = Message(
+            session_id=_session_id(update.effective_user.id),
+            role=Role.USER,
+            content="\n".join(lines),
+            transport=Transport.TELEGRAM,
+            user_id=str(update.effective_user.id),
+        )
+        response = await receive(message)
+        await _send(update, response)
+
+    except Exception as e:
+        state.log_error(f"Document handler error: {e}")
+        await update.message.reply_text(f"File handling failed: {e}")
 
 
 # ── Photo handler ─────────────────────────────────────────────────────────────
@@ -427,9 +554,13 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("compact", cmd_compact))
     app.add_handler(CommandHandler("compact_ok", cmd_compact_ok))
     app.add_handler(CommandHandler("compact_cancel", cmd_compact_cancel))
+    app.add_handler(CommandHandler("voice", cmd_voice))
 
     # Voice and audio messages
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
+
+    # PDF, DOCX, TXT document uploads
+    app.add_handler(MessageHandler(filters.Document.ALL & ~filters.Document.IMAGE, handle_document))
 
     # Photo and image documents
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_photo))
@@ -505,6 +636,7 @@ async def set_commands(app: Application) -> None:
         BotCommand("compact", "Compact session memory"),
         BotCommand("compact_ok", "Confirm and apply compact"),
         BotCommand("compact_cancel", "Discard compact draft"),
+        BotCommand("voice", "Toggle voice mode on/off"),
     ])
     from scheduler import runner
     runner.start(app.bot)
