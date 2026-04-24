@@ -13,6 +13,11 @@ from thrall.tools.agents import spawn, result as agent_result, await_all, list a
 from thrall.tools.shell import run as shell_run
 from thrall.tools.scheduler import add as sched_add, list as sched_list, delete as sched_delete
 from thrall.tools.git import run as git_run
+from thrall.tools.clipboard import read as clip_read, write as clip_write, save as clip_save, load as clip_load, snippets as clip_snippets
+from thrall.tools.system import info as sys_info
+from thrall.tools.documents import read_pdf as doc_read_pdf, read_docx as doc_read_docx
+from thrall.tools.browser import navigate as browser_navigate, screenshot as browser_screenshot, click as browser_click, fill as browser_fill, extract as browser_extract, close as browser_close
+from thrall.tools.audio import generate as audio_generate
 from thrall.tools.audit_hook import before_call, after_call
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -48,6 +53,21 @@ _TOOLS: dict = {
     sched_list.NAME: sched_list.execute,
     sched_delete.NAME: sched_delete.execute,
     git_run.NAME: git_run.execute,
+    clip_read.NAME: clip_read.execute,
+    clip_write.NAME: clip_write.execute,
+    clip_save.NAME: clip_save.execute,
+    clip_load.NAME: clip_load.execute,
+    clip_snippets.NAME: clip_snippets.execute,
+    sys_info.NAME: sys_info.execute,
+    doc_read_pdf.NAME: doc_read_pdf.execute,
+    doc_read_docx.NAME: doc_read_docx.execute,
+    browser_navigate.NAME: browser_navigate.execute,
+    browser_screenshot.NAME: browser_screenshot.execute,
+    browser_click.NAME: browser_click.execute,
+    browser_fill.NAME: browser_fill.execute,
+    browser_extract.NAME: browser_extract.execute,
+    browser_close.NAME: browser_close.execute,
+    audio_generate.NAME: audio_generate.execute,
 }
 
 _SCHEMAS: dict = {
@@ -81,6 +101,21 @@ _SCHEMAS: dict = {
     sched_list.NAME: (sched_list.DESCRIPTION, sched_list.PARAMETERS),
     sched_delete.NAME: (sched_delete.DESCRIPTION, sched_delete.PARAMETERS),
     git_run.NAME: (git_run.DESCRIPTION, git_run.PARAMETERS),
+    clip_read.NAME: (clip_read.DESCRIPTION, clip_read.PARAMETERS),
+    clip_write.NAME: (clip_write.DESCRIPTION, clip_write.PARAMETERS),
+    clip_save.NAME: (clip_save.DESCRIPTION, clip_save.PARAMETERS),
+    clip_load.NAME: (clip_load.DESCRIPTION, clip_load.PARAMETERS),
+    clip_snippets.NAME: (clip_snippets.DESCRIPTION, clip_snippets.PARAMETERS),
+    sys_info.NAME: (sys_info.DESCRIPTION, sys_info.PARAMETERS),
+    doc_read_pdf.NAME: (doc_read_pdf.DESCRIPTION, doc_read_pdf.PARAMETERS),
+    doc_read_docx.NAME: (doc_read_docx.DESCRIPTION, doc_read_docx.PARAMETERS),
+    browser_navigate.NAME: (browser_navigate.DESCRIPTION, browser_navigate.PARAMETERS),
+    browser_screenshot.NAME: (browser_screenshot.DESCRIPTION, browser_screenshot.PARAMETERS),
+    browser_click.NAME: (browser_click.DESCRIPTION, browser_click.PARAMETERS),
+    browser_fill.NAME: (browser_fill.DESCRIPTION, browser_fill.PARAMETERS),
+    browser_extract.NAME: (browser_extract.DESCRIPTION, browser_extract.PARAMETERS),
+    browser_close.NAME: (browser_close.DESCRIPTION, browser_close.PARAMETERS),
+    audio_generate.NAME: (audio_generate.DESCRIPTION, audio_generate.PARAMETERS),
 }
 
 
