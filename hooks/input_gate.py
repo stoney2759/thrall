@@ -35,7 +35,7 @@ def _is_rate_limited(user_id: str) -> bool:
         return False
 
 # Patterns that suggest prompt injection attempts from external content
-_INJECTION_PATTERNS: list[re.Pattern] = [
+INJECTION_PATTERNS: list[re.Pattern] = [
     re.compile(r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions?", re.IGNORECASE),
     re.compile(r"you\s+are\s+now\s+", re.IGNORECASE),
     re.compile(r"forget\s+everything", re.IGNORECASE),
@@ -89,7 +89,7 @@ def sanitize_external(content: str) -> str:
 def _sanitize(content: str) -> tuple[str, bool]:
     found = False
     cleaned = content
-    for pattern in _INJECTION_PATTERNS:
+    for pattern in INJECTION_PATTERNS:
         if pattern.search(cleaned):
             found = True
             cleaned = pattern.sub("[REDACTED]", cleaned)

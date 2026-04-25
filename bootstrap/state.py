@@ -54,6 +54,10 @@ class _State:
     # Identity file baseline: filename → (content, sha256_hash) — set once at startup
     identity_baseline: dict[str, tuple[str, str]] = field(default_factory=dict)
 
+    # Active personality profile
+    active_profile: str = "default"
+    active_profile_content: str | None = None
+
 
 _STATE = _State()
 
@@ -186,6 +190,21 @@ def set_identity_baseline(filename: str, content: str, hash_: str) -> None:
 
 def get_identity_baseline(filename: str) -> tuple[str, str] | None:
     return _STATE.identity_baseline.get(filename)
+
+
+# ── Active profile ───────────────────────────────────────────────────────────
+
+def get_active_profile() -> str:
+    return _STATE.active_profile
+
+def set_active_profile(name: str) -> None:
+    _STATE.active_profile = name
+
+def get_active_profile_content() -> str | None:
+    return _STATE.active_profile_content
+
+def set_active_profile_content(content: str | None) -> None:
+    _STATE.active_profile_content = content
 
 
 # ── Interaction time ──────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ from commands.deljob import DelJobCommand
 from commands.compact import CompactCommand
 from commands.compact_confirm import CompactConfirmCommand
 from commands.compact_cancel import CompactCancelCommand
+from commands.profile import ProfileCommand
 
 _COMMANDS: dict[str, Command] = {
     cmd.name(): cmd
@@ -32,6 +33,7 @@ _COMMANDS: dict[str, Command] = {
         CompactCommand(),
         CompactConfirmCommand(),
         CompactCancelCommand(),
+        ProfileCommand(),
     ]
 }
 

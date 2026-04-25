@@ -314,6 +314,22 @@ async def _send_audio(update: Update, text: str) -> None:
         await update.message.reply_text(f"{text}\n\n⚠️ Voice failed: {e}")
 
 
+async def cmd_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_allowed(update):
+        return
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(
+        user_id=str(user.id),
+        session_id=_session_id(user.id),
+        transport=Transport.TELEGRAM,
+        args=list(context.args or []),
+    )
+    response = await dispatch("profile", ctx)
+    await update.message.reply_text(response or "No profile info.")
+
+
 # ── Commands for voice mode ───────────────────────────────────────────────────
 
 async def cmd_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -554,6 +570,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("compact", cmd_compact))
     app.add_handler(CommandHandler("compact_ok", cmd_compact_ok))
     app.add_handler(CommandHandler("compact_cancel", cmd_compact_cancel))
+    app.add_handler(CommandHandler("profile", cmd_profile))
     app.add_handler(CommandHandler("voice", cmd_voice))
 
     # Voice and audio messages
@@ -636,6 +653,7 @@ async def set_commands(app: Application) -> None:
         BotCommand("compact", "Compact session memory"),
         BotCommand("compact_ok", "Confirm and apply compact"),
         BotCommand("compact_cancel", "Discard compact draft"),
+        BotCommand("profile", "Show or switch personality profile: /profile [name]"),
         BotCommand("voice", "Toggle voice mode on/off"),
     ])
     from scheduler import runner
