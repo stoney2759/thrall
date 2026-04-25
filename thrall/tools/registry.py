@@ -18,6 +18,7 @@ from thrall.tools.system import info as sys_info
 from thrall.tools.documents import read_pdf as doc_read_pdf, read_docx as doc_read_docx
 from thrall.tools.browser import navigate as browser_navigate, screenshot as browser_screenshot, click as browser_click, fill as browser_fill, extract as browser_extract, close as browser_close
 from thrall.tools.audio import generate as audio_generate
+from thrall.tools.profile import switch as profile_switch
 from thrall.tools.audit_hook import before_call, after_call
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -68,6 +69,7 @@ _TOOLS: dict = {
     browser_extract.NAME: browser_extract.execute,
     browser_close.NAME: browser_close.execute,
     audio_generate.NAME: audio_generate.execute,
+    profile_switch.NAME: profile_switch.execute,
 }
 
 _SCHEMAS: dict = {
@@ -116,6 +118,7 @@ _SCHEMAS: dict = {
     browser_extract.NAME: (browser_extract.DESCRIPTION, browser_extract.PARAMETERS),
     browser_close.NAME: (browser_close.DESCRIPTION, browser_close.PARAMETERS),
     audio_generate.NAME: (audio_generate.DESCRIPTION, audio_generate.PARAMETERS),
+    profile_switch.NAME: (profile_switch.DESCRIPTION, profile_switch.PARAMETERS),
 }
 
 
