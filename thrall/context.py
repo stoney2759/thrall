@@ -30,9 +30,11 @@ async def assemble(message: Message) -> list[dict]:
 
 
 def load_identity() -> str | None:
+    from bootstrap import state
     soul = _read_file("SOUL.md")
     identity = _read_file("IDENTITY.md")
-    parts = [p for p in [soul, identity] if p]
+    personality = state.get_active_profile_content()
+    parts = [p for p in [soul, identity, personality] if p]
     return "\n\n".join(parts) if parts else None
 
 
