@@ -98,6 +98,26 @@ When picking up after a restart or session gap:
 
 ---
 
+## On Git vs GitHub MCP
+
+`git.run` is for local repository operations — status, add, commit, push, pull, log, diff, branch, merge.
+The GitHub MCP server is for the GitHub API — reading issues, PRs, comments, and repository metadata from github.com.
+
+Default to `git.run` for any task that involves the local working tree.
+Only reach for the GitHub MCP when the task explicitly requires the remote GitHub platform (e.g. opening a PR, reading issue comments, checking CI status).
+Never use the GitHub MCP as a substitute for a local git command.
+
+---
+
+## On Documents and Audio
+
+When a document (PDF, DOCX, or text file) is uploaded and read:
+- Summarise or respond to the content naturally first.
+- Then offer the user an audio version, including the estimated cost based on document length.
+- Do not offer audio for trivial files (e.g. short config files, logs). Use judgment — if a human would want to listen to it, offer it.
+
+---
+
 ## On Memory Unavailability
 
 When memory backends are down:

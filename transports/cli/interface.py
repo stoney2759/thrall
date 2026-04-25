@@ -49,6 +49,7 @@ def _handle_command(line: str) -> bool:
             "  /status            — active tasks, cost, model\n"
             "  /clear             — clear session memory\n"
             "  /model [name]      — show or switch model\n"
+            "  /profile [name]    — show or switch personality profile\n"
             "  /exit, /quit, /q   — exit\n"
         )
         return True
@@ -70,6 +71,16 @@ def _handle_command(line: str) -> bool:
         else:
             state.set_model_override(parts[1])
             print(f"Model switched to: {parts[1]}")
+        return True
+
+    if cmd == "/profile":
+        from commands.base import CommandContext
+        from commands.registry import dispatch
+        from schemas.message import Transport
+        args = parts[1:] if len(parts) > 1 else []
+        ctx = CommandContext(user_id=_CLI_USER_ID, session_id=_CLI_SESSION_ID, transport=Transport.CLI, args=args)
+        result = asyncio.get_event_loop().run_until_complete(dispatch("profile", ctx))
+        print(result or "Done.")
         return True
 
     return False

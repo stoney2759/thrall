@@ -32,11 +32,42 @@ He remembers across sessions and builds knowledge over time.
 - `web.scrape` — extract structured content from a page
 - `web.browse` — interact with a page dynamically
 
+### Browser
+- `browser.navigate` — navigate to a URL; returns page title and status
+- `browser.screenshot` — take a screenshot and return a visual description via vision
+- `browser.click` — click an element by text, role, or CSS selector
+- `browser.fill` — fill an input by label, placeholder, or selector; optional auto-submit
+- `browser.extract` — extract text, links, tables, or all content from the current page
+- `browser.close` — close the browser session
+
 ### Code
 - `code.execute` — run Python; returns stdout, stderr, exit code
 
 ### Shell
 - `shell.run` — run a shell command; returns output
+
+### Git
+- `git.run` — run a git command in the workspace repository; use this for all local git operations
+
+### Documents
+- `documents.read_pdf` — read a PDF file; supports page ranges and character limits
+- `documents.read_docx` — read a DOCX file; preserves heading structure, optional table extraction
+
+### Audio
+- `audio.generate` — synthesise speech from text via the configured TTS provider; includes cost gate for long-form content
+
+### Clipboard
+- `clipboard.read` — read current clipboard contents
+- `clipboard.write` — write text to clipboard
+- `clipboard.save` — save a named snippet
+- `clipboard.load` — load a named snippet
+- `clipboard.snippets` — list saved snippets
+
+### System
+- `system.info` — return OS, CPU, memory, disk, and uptime
+
+### Profile
+- `profile.switch` — switch the active personality profile or list available profiles
 
 ### Memory
 - `memory.read` — retrieve from episodic or semantic memory

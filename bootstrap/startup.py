@@ -18,6 +18,7 @@ def start() -> None:
     state.set_cwd(str(Path.cwd()))
     _init_workspace(config)
     _hash_identity_files()
+    _load_default_profile()
     _scan_catalog()
 
 
@@ -73,6 +74,12 @@ def _hash_identity_files() -> None:
             content = path.read_text(encoding="utf-8").strip()
             hash_ = hashlib.sha256(content.encode("utf-8")).hexdigest()
             state.set_identity_baseline(filename, content, hash_)
+
+
+def _load_default_profile() -> None:
+    path = Path(__file__).parent.parent / "identity" / "PERSONALITY.md"
+    if path.exists():
+        state.set_active_profile_content(path.read_text(encoding="utf-8").strip())
 
 
 def _scan_catalog() -> None:
