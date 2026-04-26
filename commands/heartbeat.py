@@ -1,7 +1,7 @@
 from __future__ import annotations
+import uuid
 from datetime import datetime, timezone
 from commands.base import Command, CommandContext
-from bootstrap import state
 
 
 class HeartbeatCommand(Command):
@@ -9,37 +9,42 @@ class HeartbeatCommand(Command):
         return "heartbeat"
 
     def description(self) -> str:
-        return "Check system health and last activity"
+        return "Add a recurring job: /heartbeat <schedule> <task> [agent=<name>] [silent]"
 
     async def execute(self, ctx: CommandContext) -> str:
-        now = datetime.now(timezone.utc)
-        last = state.get_last_interaction()
-        delta = now - last
-        seconds = int(delta.total_seconds())
+        if len(ctx.args) < 2:
+            return (
+                "Usage: /heartbeat <schedule> <task> [agent=<name>] [silent]\n"
+                "Example: /heartbeat 30m summarise the workspace"
+            )
 
-        if seconds < 60:
-            idle = f"{seconds}s ago"
-        elif seconds < 3600:
-            idle = f"{seconds // 60}m ago"
-        else:
-            idle = f"{seconds // 3600}h ago"
+        from scheduler.job import Job
+        from scheduler.parser import parse_schedule
+        from scheduler import store
 
-        errors = state.get_error_log()
-        recent_errors = errors[-3:] if errors else []
+        raw_schedule = ctx.args[0]
+        output_mode = "silent" if "silent" in ctx.args else "verbose"
+        agent = next((a.split("=", 1)[1] for a in ctx.args if a.startswith("agent=")), None)
+        task_parts = [a for a in ctx.args[1:] if not a.startswith("agent=") and a != "silent"]
+        task = " ".join(task_parts)
 
-        lines = [
-            "Heartbeat",
-            f"  Status       : alive",
-            f"  Last active  : {idle}",
-            f"  Active tasks : {state.get_active_task_count()}",
-            f"  Total cost   : ${state.get_total_cost():.4f}",
-            f"  Error count  : {len(errors)}",
-        ]
-        if recent_errors:
-            lines.append("  Recent errors:")
-            for e in recent_errors:
-                ts = e.get("timestamp", "?")[:19]
-                msg = e.get("error", "")[:80]
-                lines.append(f"    [{ts}] {msg}")
+        try:
+            parsed = await parse_schedule(raw_schedule)
+        except ValueError as e:
+            return f"Could not parse schedule: {e}"
 
-        return "\n".join(lines)
+        job = Job(
+            id=uuid.uuid4().hex[:8],
+            type="heartbeat",
+            schedule=raw_schedule,
+            cron_expr=parsed.cron_expr,
+            human_summary=parsed.human_summary,
+            task=task,
+            agent=agent,
+            output_mode=output_mode,
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+        store.add_job(job)
+
+        agent_str = f" | agent: {agent}" if agent else ""
+        return f"Job {job.id} scheduled\nSchedule: {parsed.human_summary}\nTask: {task[:100]}{agent_str}"
