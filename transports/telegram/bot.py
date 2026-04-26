@@ -120,6 +120,22 @@ async def cmd_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f"Model switched to: `{model}`", parse_mode=ParseMode.MARKDOWN)
 
 
+async def cmd_memory(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_allowed(update):
+        return
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(
+        user_id=str(user.id),
+        session_id=_session_id(user.id),
+        transport=Transport.TELEGRAM,
+        args=list(context.args or []),
+    )
+    response = await dispatch("memory", ctx)
+    await update.message.reply_text(response or "No memory data.")
+
+
 async def cmd_restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_allowed(update):
         return
@@ -537,6 +553,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("tasks", cmd_tasks))
     app.add_handler(CommandHandler("cost", cmd_cost))
     app.add_handler(CommandHandler("restart", cmd_restart))
+    app.add_handler(CommandHandler("memory", cmd_memory))
     app.add_handler(CommandHandler("health", cmd_health))
     app.add_handler(CommandHandler("heartbeat", cmd_heartbeat_add))
     app.add_handler(CommandHandler("cron", cmd_cron))
@@ -620,6 +637,7 @@ async def set_commands(app: Application) -> None:
         BotCommand("tasks", "List active tasks"),
         BotCommand("cost", "Token usage and spend"),
         BotCommand("restart", "Reload config and state"),
+        BotCommand("memory", "Inspect session memory: /memory [list|clear|search <query>]"),
         BotCommand("health", "System health and errors"),
         BotCommand("heartbeat", "Add recurring job: /heartbeat 30m <task>"),
         BotCommand("cron", "Add timed job: /cron 18:00 <task>"),
