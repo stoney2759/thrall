@@ -71,6 +71,16 @@ def _handle_command(line: str) -> bool:
             print(f"Model switched to: {parts[1]}")
         return True
 
+    if cmd == "/memory":
+        from commands.base import CommandContext
+        from commands.registry import dispatch
+        from schemas.message import Transport
+        args = parts[1:] if len(parts) > 1 else []
+        ctx = CommandContext(user_id=_CLI_USER_ID, session_id=_CLI_SESSION_ID, transport=Transport.CLI, args=args)
+        result = asyncio.get_event_loop().run_until_complete(dispatch("memory", ctx))
+        print(result or "No memory data.")
+        return True
+
     if cmd == "/heartbeat":
         from commands.base import CommandContext
         from commands.registry import dispatch
