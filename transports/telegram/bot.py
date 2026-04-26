@@ -70,17 +70,17 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_allowed(update):
         return
-    text = (
-        "*Thrall Commands*\n\n"
-        "/start — initialise session\n"
-        "/help — this message\n"
-        "/status — active tasks, uptime, cost\n"
-        "/clear — clear session memory\n"
-        "/model `<name>` — switch LLM model\n"
-        "/tasks — list active tasks\n"
-        "/cost — token usage and spend"
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(
+        user_id=str(user.id),
+        session_id=_session_id(user.id),
+        transport=Transport.TELEGRAM,
+        args=[],
     )
-    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+    response = await dispatch("help", ctx)
+    await update.message.reply_text(response or "No commands found.")
 
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

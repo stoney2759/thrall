@@ -43,17 +43,13 @@ def _handle_command(line: str) -> bool:
         sys.exit(0)
 
     if cmd == "/help":
-        print(
-            "\nCommands:\n"
-            "  /help              — this message\n"
-            "  /status            — active tasks, cost, model\n"
-            "  /clear             — clear session memory\n"
-            "  /model [name]      — show or switch model\n"
-            "  /profile [name]    — show or switch personality profile\n"
-            "  /cron <schedule> <task> — add a timed job\n"
-            "  /heartbeat <schedule> <task> — add a recurring job\n"
-            "  /exit, /quit, /q   — exit\n"
-        )
+        from commands.base import CommandContext
+        from commands.registry import dispatch
+        from schemas.message import Transport
+        ctx = CommandContext(user_id=_CLI_USER_ID, session_id=_CLI_SESSION_ID, transport=Transport.CLI, args=[])
+        result = asyncio.get_event_loop().run_until_complete(dispatch("help", ctx))
+        print(result or "No commands found.")
+        print("  /exit, /quit, /q   — exit")
         return True
 
     if cmd == "/status":
