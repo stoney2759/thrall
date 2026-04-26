@@ -192,61 +192,36 @@ async def cmd_compact_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await _compact_handler(update, context, "compact_cancel")
 
 
-async def _add_job_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, job_type: str) -> None:
+async def cmd_heartbeat_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_allowed(update):
         return
-    args = list(context.args or [])
-    if len(args) < 2:
-        usage = f"Usage: /{job_type} <schedule> <task> [agent=<name>] [silent]"
-        if job_type == "heartbeat":
-            usage += "\nExample: /heartbeat 30m summarise the workspace"
-        else:
-            usage += "\nExample: /cron 'every monday at 9am' check the news and report"
-        await update.message.reply_text(usage)
-        return
-
-    raw_schedule = args[0]
-    output_mode = "silent" if "silent" in args else "verbose"
-    agent = next((a.split("=", 1)[1] for a in args if a.startswith("agent=")), None)
-    task_parts = [a for a in args[1:] if not a.startswith("agent=") and a != "silent"]
-    task = " ".join(task_parts)
-
-    from scheduler.job import Job
-    from scheduler.parser import parse_schedule
-    from scheduler import store
-    import uuid as _uuid
-    from datetime import datetime, timezone as _tz
-
-    try:
-        parsed = await parse_schedule(raw_schedule)
-    except ValueError as e:
-        await update.message.reply_text(f"Could not parse schedule: {e}")
-        return
-
-    job = Job(
-        id=_uuid.uuid4().hex[:8],
-        type=job_type,
-        schedule=raw_schedule,
-        cron_expr=parsed.cron_expr,
-        human_summary=parsed.human_summary,
-        task=task,
-        agent=agent,
-        output_mode=output_mode,
-        created_at=datetime.now(_tz.utc).isoformat(),
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(
+        user_id=str(user.id),
+        session_id=_session_id(user.id),
+        transport=Transport.TELEGRAM,
+        args=list(context.args or []),
     )
-    store.add_job(job)
-    agent_str = f" | agent: {agent}" if agent else ""
-    await update.message.reply_text(
-        f"Job {job.id} scheduled\nSchedule: {parsed.human_summary}\nTask: {task[:100]}{agent_str}"
-    )
-
-
-async def cmd_heartbeat_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await _add_job_handler(update, context, "heartbeat")
+    response = await dispatch("heartbeat", ctx)
+    await update.message.reply_text(response or "Done.")
 
 
 async def cmd_cron(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await _add_job_handler(update, context, "cron")
+    if not _is_allowed(update):
+        return
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(
+        user_id=str(user.id),
+        session_id=_session_id(user.id),
+        transport=Transport.TELEGRAM,
+        args=list(context.args or []),
+    )
+    response = await dispatch("cron", ctx)
+    await update.message.reply_text(response or "Done.")
 
 
 async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

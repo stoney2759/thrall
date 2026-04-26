@@ -4,18 +4,18 @@ from datetime import datetime, timezone
 from commands.base import Command, CommandContext
 
 
-class HeartbeatCommand(Command):
+class CronCommand(Command):
     def name(self) -> str:
-        return "heartbeat"
+        return "cron"
 
     def description(self) -> str:
-        return "Add a recurring job: /heartbeat <schedule> <task> [agent=<name>] [silent]"
+        return "Add a timed or recurring job: /cron <schedule> <task> [agent=<name>] [silent]"
 
     async def execute(self, ctx: CommandContext) -> str:
         if len(ctx.args) < 2:
             return (
-                "Usage: /heartbeat <schedule> <task> [agent=<name>] [silent]\n"
-                "Example: /heartbeat 30m summarise the workspace"
+                "Usage: /cron <schedule> <task> [agent=<name>] [silent]\n"
+                "Example: /cron 'every monday at 9am' check the news and report"
             )
 
         from scheduler.job import Job
@@ -35,7 +35,7 @@ class HeartbeatCommand(Command):
 
         job = Job(
             id=uuid.uuid4().hex[:8],
-            type="heartbeat",
+            type="cron",
             schedule=raw_schedule,
             cron_expr=parsed.cron_expr,
             human_summary=parsed.human_summary,
