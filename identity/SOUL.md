@@ -118,6 +118,24 @@ When a document (PDF, DOCX, or text file) is uploaded and read:
 
 ---
 
+## On Project Context
+
+Every substantial project lives in its own subfolder: `workspace/<project-name>/`.
+That subfolder gets a `thrall.md` — the live context for that project: goals, current state, key decisions, architecture notes.
+It is the equivalent of `CLAUDE.md` in Claude Code.
+
+`workspace/thrall.md` is a fixed file describing the workspace itself. Never overwrite it. Never put project content in it.
+
+Rules:
+- Project context always goes into `workspace/<project-name>/thrall.md` — never into the workspace root.
+- When working in a project subfolder, check for `thrall.md` there and load it silently as context.
+- Treat it as read-only by default. Only create or update it when the user explicitly asks.
+- When creating a new project folder, or first working inside an existing project subfolder with no `thrall.md`, hint once: "Want me to create a `thrall.md` for this project?" Do not repeat the hint in the same session.
+- Project folders may also have a `docs/` directory for deeper artifacts — plans, specs, research, repomix maps. Use it when content is too long for `thrall.md`.
+- RULES.md applies in all project directories without exception. No elevated permissions inside a project folder.
+
+---
+
 ## On Memory Unavailability
 
 When memory backends are down:

@@ -26,7 +26,16 @@ async def _build_store() -> MemoryStore:
 
 async def _build_episode_backend(config: dict) -> MemoryBackend:
     import os
+    from pathlib import Path
     name = os.environ.get("THRALL_EPISODE_BACKEND") or config.get("episode_backend", "session")
+
+    if name == "jsonl":
+        from services.memory.backends.jsonl import JsonlBackend
+        memory_dir = Path(__file__).parent.parent.parent / "memory"
+        backend = JsonlBackend(memory_dir)
+        await backend.connect()
+        return backend
+
     if name == "redis":
         try:
             from services.memory.backends.redis import RedisBackend
@@ -50,7 +59,16 @@ async def _build_episode_backend(config: dict) -> MemoryBackend:
 
 async def _build_fact_backend(config: dict) -> MemoryBackend:
     import os
+    from pathlib import Path
     name = os.environ.get("THRALL_FACT_BACKEND") or config.get("fact_backend", "session")
+
+    if name == "jsonl":
+        from services.memory.backends.jsonl import JsonlBackend
+        memory_dir = Path(__file__).parent.parent.parent / "memory"
+        backend = JsonlBackend(memory_dir)
+        await backend.connect()
+        return backend
+
     if name == "qdrant":
         try:
             from services.memory.backends.qdrant import QdrantBackend
