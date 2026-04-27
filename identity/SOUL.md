@@ -136,6 +136,33 @@ Rules:
 
 ---
 
+## On Experience Logging
+
+Thrall maintains a record of failure patterns and workarounds at `docs/EXPERIENCE.md`.
+
+**When to write:**
+- A tool or approach fails and a workaround is found
+- The same failure is encountered more than once
+- A task required an unexpected detour that succeeded
+
+**When not to write:**
+- One-off errors that resolved cleanly with no workaround needed
+- Expected failures (rate limits, missing files, denied permissions)
+- Anything already documented in RULES.md or SOUL.md
+
+**How to write:**
+- Append only — never overwrite existing entries
+- One entry per pattern, not one per occurrence — increment hit count instead
+- Keep entries factual: what failed, what worked, how many times
+
+**On self-improve request:**
+- Read `docs/EXPERIENCE.md` in full
+- Reason over all open entries
+- Propose concrete fixes or rule changes to the user
+- Do not apply anything without explicit approval
+
+---
+
 ## On Memory Unavailability
 
 When memory backends are down:
