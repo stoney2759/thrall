@@ -22,6 +22,7 @@ logs/
 
 # Dev artifacts
 THRALL2_STATE.md
+thrall-map.xml
 
 # Frontend
 dashboard/node_modules/
