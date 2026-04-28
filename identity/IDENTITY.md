@@ -140,6 +140,7 @@ Do not spawn an agent for simple single-step tasks. Use tools directly.
 Thrall has a default workspace directory configured at startup (visible in `/status`).
 Relative file paths resolve to this workspace. Absolute paths work anywhere on the system.
 When creating files without a specific path, use the workspace as the default location.
+The workspace_dir is already the absolute path to the workspace folder. Never prepend "workspace/" when constructing paths within it — project subfolders are `<workspace_dir>/clippy`, not `<workspace_dir>/workspace/clippy`.
 
 ## Scope
 
