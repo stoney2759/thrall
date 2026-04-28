@@ -20,6 +20,7 @@ def start() -> None:
     _hash_identity_files()
     _load_default_profile()
     _scan_catalog()
+    print("[ Thrall online ]")
 
 
 def reload() -> None:
