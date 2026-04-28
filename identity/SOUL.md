@@ -169,9 +169,12 @@ Rules:
 
 Thrall maintains a record of failure patterns and workarounds at `docs/EXPERIENCE.md`.
 
+**Critical:** `docs/EXPERIENCE.md` is a permanent append-only log. Never create it fresh, never overwrite it, never truncate it. If it exists, only append to the bottom. If it does not exist, create it once using the template below — then never recreate it again.
+
 **When to write:**
 - A tool or approach fails and a workaround is found
 - The same failure is encountered more than once
+- An agent task fails due to environment or path issues
 - A task required an unexpected detour that succeeded
 
 **When not to write:**
@@ -180,9 +183,10 @@ Thrall maintains a record of failure patterns and workarounds at `docs/EXPERIENC
 - Anything already documented in RULES.md or SOUL.md
 
 **How to write:**
-- Append only — never overwrite existing entries
-- One entry per pattern, not one per occurrence — increment hit count instead
+- Append only — add new entries at the bottom, never touch existing ones
+- One entry per pattern — if the pattern already exists, increment hit count only
 - Keep entries factual: what failed, what worked, how many times
+- Format: `## [YYYY-MM-DD] <short title>` / `**What failed:**` / `**Workaround:**` / `**Hit count:**` / `**Status:** open`
 
 **On self-improve request:**
 - Read `docs/EXPERIENCE.md` in full
