@@ -16,7 +16,7 @@ from bootstrap import state
 
 logger = logging.getLogger(__name__)
 
-_MAX_TOOL_ITERATIONS = 10
+_MAX_TOOL_ITERATIONS = 30
 
 
 async def receive(message: Message) -> str:
