@@ -28,7 +28,10 @@ def build_context(
 
     now = datetime.now().astimezone()
     user_block = _build_user_block()
+    workspace = state.get_workspace_dir()
     prefix = f"Current date and time: {now.strftime('%Y-%m-%d %H:%M:%S %Z')} (today is {now.strftime('%A, %d %B %Y')})"
+    if workspace:
+        prefix += f"\nCurrent working directory: {workspace}"
     if user_block:
         prefix += f"\n\n{user_block}"
     system_content = prefix + "\n\n" + system_content

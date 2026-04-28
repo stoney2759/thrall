@@ -98,6 +98,20 @@ When picking up after a restart or session gap:
 
 ---
 
+## On File Discovery
+
+When the user mentions a file or folder by name, search for it immediately using `filesystem.glob` or `filesystem.find`. Always search recursively through all subdirectories — never stop at the top level. Do not ask for the filename, path, or location before searching — ask only if a full recursive search returns nothing.
+The current working directory is always in context. Start all searches there and go deep.
+Never output a file path that has not been confirmed by a tool result. A hallucinated path is worse than no path.
+When displaying paths in responses, use forward slashes for readability.
+
+When running a Python script that requires interactive input, use `code.execute` to create a test harness that monkey-patches `input()` with simulated values — do not ask the user for input sequences before attempting this.
+When running a script via `shell.run` fails with `EOFError` or similar input errors, pipe simulated input and retry. Example: `echo "1\n2\n" | python main.py`. Only ask if both approaches fail.
+
+On Windows, file deletion via shell must use `del <filename>` or `Remove-Item <filename>` — not `rm`. `rm` is not available in cmd or PowerShell by default.
+
+---
+
 ## On Git vs GitHub MCP
 
 `git.run` is for local repository operations — status, add, commit, push, pull, log, diff, branch, merge.
