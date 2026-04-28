@@ -41,6 +41,17 @@ async def execute(call: ToolCall) -> ToolResult:
                 f"[User replied]: {brief}"
             )
 
+    # Duplicate agent guard — prevent spawning the same named profile twice
+    if profile_name and profile_name != "default":
+        from thrall.tasks.pool import list_active
+        from schemas.task import TaskStatus
+        active = [
+            t for t in list_active()
+            if t.profile.name == profile_name and t.status in (TaskStatus.PENDING, TaskStatus.RUNNING)
+        ]
+        if active:
+            return _result(call.id, error=f"agent '{profile_name}' is already active (task {active[0].id}). Wait for it to complete or use agents.result to collect its output.", start=start)
+
     profile = CapabilityProfile(
         name=profile_name,
         allowed_tools=allowed_tools or _DEFAULT_TOOLS,
