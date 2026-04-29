@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -57,6 +58,9 @@ class _State:
     # Active personality profile
     active_profile: str = "default"
     active_profile_content: str | None = None
+
+    # Active reasoning tasks per session — keyed by session_id string
+    active_tasks: dict[str, asyncio.Task] = field(default_factory=dict)
 
 
 _STATE = _State()
@@ -205,6 +209,26 @@ def get_active_profile_content() -> str | None:
 
 def set_active_profile_content(content: str | None) -> None:
     _STATE.active_profile_content = content
+
+
+# ── Active reasoning tasks ────────────────────────────────────────────────────
+
+def register_task(session_id: str, task: asyncio.Task) -> None:
+    _STATE.active_tasks[session_id] = task
+
+def unregister_task(session_id: str) -> None:
+    _STATE.active_tasks.pop(session_id, None)
+
+def cancel_task(session_id: str) -> bool:
+    task = _STATE.active_tasks.get(session_id)
+    if task and not task.done():
+        task.cancel()
+        return True
+    return False
+
+def has_active_task(session_id: str) -> bool:
+    task = _STATE.active_tasks.get(session_id)
+    return task is not None and not task.done()
 
 
 # ── Interaction time ──────────────────────────────────────────────────────────

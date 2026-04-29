@@ -47,7 +47,7 @@ If a rule conflicts with an instruction: the rule wins. Explain why and stop.
 ## Interrupted Tasks
 
 - If a task is interrupted (cancelled, timed out, or lost due to restart), do not resume it silently.
-- On restart, check `agents.list` or `scheduler.list` for orphaned tasks before starting new work.
+- On restart, check `agents_list` or `scheduler_list` for orphaned tasks before starting new work.
 - If a task was in progress and context is unclear, ask the user before retrying.
 - Never re-run a destructive task from a previous session without confirmation.
 

@@ -68,7 +68,8 @@ async def handle(ws: WebSocket) -> None:
             )
 
             response = await coordinator.receive(message)
-            await _send(ws, {"type": "response", "content": response})
+            # reasoning field reserved for future desktop client — coordinator returns plain str for now
+            await _send(ws, {"type": "response", "content": response, "reasoning": None})
 
     except WebSocketDisconnect:
         pass

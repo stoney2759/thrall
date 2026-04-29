@@ -13,78 +13,78 @@ He remembers across sessions and builds knowledge over time.
 ## Tools
 
 ### Filesystem
-- `filesystem.read` — read a file
-- `filesystem.write` — write or create a file
-- `filesystem.edit` — patch a file in place
-- `filesystem.append` — append to a file
-- `filesystem.cat` — print file contents
-- `filesystem.ls` — list directory contents
-- `filesystem.glob` — find files by pattern
-- `filesystem.grep` — search content across files
-- `filesystem.tree` — directory tree view
-- `filesystem.stat` — file metadata
-- `filesystem.find` — find files by name or type
-- `filesystem.diff` — diff two files
+- `filesystem_read` — read a file
+- `filesystem_write` — write or create a file
+- `filesystem_edit` — patch a file in place
+- `filesystem_append` — append to a file
+- `filesystem_cat` — print file contents
+- `filesystem_ls` — list directory contents
+- `filesystem_glob` — find files by pattern
+- `filesystem_grep` — search content across files
+- `filesystem_tree` — directory tree view
+- `filesystem_stat` — file metadata
+- `filesystem_find` — find files by name or type
+- `filesystem_diff` — diff two files
 
 ### Web
-- `web.search` — search the web
-- `web.fetch` — fetch raw content from a URL
-- `web.scrape` — extract structured content from a page
-- `web.browse` — interact with a page dynamically
+- `web_search` — search the web
+- `web_fetch` — fetch raw content from a URL
+- `web_scrape` — extract structured content from a page
+- `web_browse` — interact with a page dynamically
 
 ### Browser
-- `browser.navigate` — navigate to a URL; returns page title and status
-- `browser.screenshot` — take a screenshot and return a visual description via vision
-- `browser.click` — click an element by text, role, or CSS selector
-- `browser.fill` — fill an input by label, placeholder, or selector; optional auto-submit
-- `browser.extract` — extract text, links, tables, or all content from the current page
-- `browser.close` — close the browser session
+- `browser_navigate` — navigate to a URL; returns page title and status
+- `browser_screenshot` — take a screenshot and return a visual description via vision
+- `browser_click` — click an element by text, role, or CSS selector
+- `browser_fill` — fill an input by label, placeholder, or selector; optional auto-submit
+- `browser_extract` — extract text, links, tables, or all content from the current page
+- `browser_close` — close the browser session
 
 ### Code
-- `code.execute` — run Python; returns stdout, stderr, exit code
+- `code_execute` — run Python; returns stdout, stderr, exit code
 
 ### Shell
-- `shell.run` — run a shell command; returns output. On Windows use forward slashes or escape backslashes in paths, and quote paths containing spaces. For Windows-native operations (process management, registry, etc.) prefix the command with `powershell -Command`.
+- `shell_run` — run a shell command; returns output. On Windows use forward slashes or escape backslashes in paths, and quote paths containing spaces. For Windows-native operations (process management, registry, etc.) prefix the command with `powershell -Command`.
 
 ### Git
-- `git.run` — run a git command in the workspace repository; use this for all local git operations
+- `git_run` — run a git command in the workspace repository; use this for all local git operations
 
 ### Documents
-- `documents.read_pdf` — read a PDF file; supports page ranges and character limits
-- `documents.read_docx` — read a DOCX file; preserves heading structure, optional table extraction
+- `documents_read_pdf` — read a PDF file; supports page ranges and character limits
+- `documents_read_docx` — read a DOCX file; preserves heading structure, optional table extraction
 
 ### Audio
-- `audio.generate` — synthesise speech from text via the configured TTS provider; includes cost gate for long-form content
+- `audio_generate` — synthesise speech from text via the configured TTS provider; includes cost gate for long-form content
 
 ### Clipboard
-- `clipboard.read` — read current clipboard contents
-- `clipboard.write` — write text to clipboard
-- `clipboard.save` — save a named snippet
-- `clipboard.load` — load a named snippet
-- `clipboard.snippets` — list saved snippets
+- `clipboard_read` — read current clipboard contents
+- `clipboard_write` — write text to clipboard
+- `clipboard_save` — save a named snippet
+- `clipboard_load` — load a named snippet
+- `clipboard_snippets` — list saved snippets
 
 ### System
-- `system.info` — return OS, CPU, memory, disk, and uptime
+- `system_info` — return OS, CPU, memory, disk, and uptime
 
 ### Profile
-- `profile.switch` — switch the active personality profile or list available profiles
+- `profile_switch` — switch the active personality profile or list available profiles
 
 ### Memory
-- `memory.read` — retrieve from episodic or semantic memory
-- `memory.write` — persist to episodic or semantic memory
+- `memory_read` — retrieve from episodic or semantic memory
+- `memory_write` — persist to episodic or semantic memory
 
 ### Agents
-- `agents.spawn` — spawn an agent on a task; returns task_id
-- `agents.result` — get result of a spawned agent
-- `agents.await_all` — wait for multiple agents and collect results
-- `agents.list` — list running and recent agents
-- `agents.create` — design and save a new named agent (draft first, confirm to save)
-- `agents.prepare` — assign tools to a catalog agent that has none (use when a new agent is dropped in)
+- `agents_spawn` — spawn an agent on a task; returns task_id
+- `agents_result` — get result of a spawned agent
+- `agents_await_all` — wait for multiple agents and collect results
+- `agents_list` — list running and recent agents
+- `agents_create` — design and save a new named agent (draft first, confirm to save)
+- `agents_prepare` — assign tools to a catalog agent that has none (use when a new agent is dropped in)
 
 ### Scheduler
-- `scheduler.add` — add a scheduled or recurring job
-- `scheduler.list` — list all scheduled jobs
-- `scheduler.delete` — delete a scheduled job
+- `scheduler_add` — add a scheduled or recurring job
+- `scheduler_list` — list all scheduled jobs
+- `scheduler_delete` — delete a scheduled job
 
 ---
 
@@ -121,7 +121,7 @@ Spawn an agent when:
 - The task is naturally parallel (research multiple topics simultaneously)
 - The task benefits from isolation (separate context, separate tool scope)
 
-Workflow: spawn → get task_id → do other work → agents.result or agents.await_all to collect.
+Workflow: spawn → get task_id → do other work → agents_result or agents_await_all to collect.
 Do not spawn an agent for simple single-step tasks. Use tools directly.
 
 ---

@@ -1,8 +1,11 @@
 from __future__ import annotations
 import asyncio
 import inspect
+import logging
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
+
+logger = logging.getLogger(__name__)
 
 # ── Tool imports ──────────────────────────────────────────────────────────────
 from thrall.tools.filesystem import read, write, edit, append, glob, grep, cat, ls, tree, stat, find, diff
@@ -125,6 +128,13 @@ _SCHEMAS: dict = {
 _MCP_TOOLS: dict[str, dict] = {}  # name -> full OpenAI-format tool definition
 _MCP_EXECUTORS: dict[str, str] = {}  # name -> server_name (for routing)
 
+# Dots are not valid in OpenAI function names (spec: ^[a-zA-Z0-9_-]+$).
+# We send underscore names to the API and map them back to internal dot names.
+_API_TO_INTERNAL: dict[str, str] = {
+    name.replace(".", "_"): name
+    for name in _SCHEMAS
+}
+
 
 def register_mcp_tools(tool_defs: list[dict]) -> None:
     """Register MCP tool definitions at runtime after server connections are established."""
@@ -143,6 +153,7 @@ def get_definitions(allowed: list[str] | None = None) -> list[dict]:
 
 
 def _to_openai_def(name: str) -> dict:
+    api_name = name.replace(".", "_")
     description, parameters = _SCHEMAS[name]
     required = [k for k, v in parameters.items() if v.get("required", False)]
     properties = {
@@ -152,7 +163,7 @@ def _to_openai_def(name: str) -> dict:
     return {
         "type": "function",
         "function": {
-            "name": name,
+            "name": api_name,
             "description": description,
             "parameters": {
                 "type": "object",
@@ -179,9 +190,21 @@ async def execute(name: str, args: dict, session_id: UUID, caller: str) -> ToolR
             duration = int((time.monotonic() - start) * 1000)
             return ToolResult(call_id=uuid4(), error=str(e), duration_ms=duration)
 
+    # Resolve API name (underscore) → internal name (dot)
+    name = _API_TO_INTERNAL.get(name, name)
+
     if name not in _TOOLS:
-        from uuid import uuid4
-        return ToolResult(call_id=uuid4(), error=f"unknown tool: {name}", duration_ms=0)
+        # Last-resort: short-name recovery for context drift (e.g. "ls" → "filesystem.ls")
+        short_index = _short_name_index()
+        if name in short_index and len(short_index[name]) == 1:
+            resolved = next(iter(short_index[name]))
+            logger.warning("Tool name drift: %r resolved to %r", name, resolved)
+            name = resolved
+        else:
+            from uuid import uuid4
+            available = sorted(_TOOLS.keys())
+            logger.warning("Unknown tool requested: %r — available: %s", name, available)
+            return ToolResult(call_id=uuid4(), error=f"unknown tool: {name}", duration_ms=0)
 
     call = ToolCall(session_id=session_id, name=name, args=args, caller=caller)
     before_call(name, args, caller, session_id)
@@ -192,6 +215,15 @@ async def execute(name: str, args: dict, session_id: UUID, caller: str) -> ToolR
         result = await asyncio.to_thread(fn, call)
     after_call(name, result.duration_ms, result.error)
     return result
+
+
+def _short_name_index() -> dict[str, set[str]]:
+    """Map bare name (after last dot) → set of full names. Used for drift recovery."""
+    index: dict[str, set[str]] = {}
+    for full_name in _TOOLS:
+        short = full_name.rsplit(".", 1)[-1]
+        index.setdefault(short, set()).add(full_name)
+    return index
 
 
 def list_tools() -> list[str]:

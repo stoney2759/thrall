@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import os
 import tomllib
 from pathlib import Path
@@ -17,10 +18,35 @@ def start() -> None:
     state.set_config(config)
     state.set_cwd(str(Path.cwd()))
     _init_workspace(config)
+    _configure_logging()
     _hash_identity_files()
     _load_default_profile()
     _scan_catalog()
     print("[ Thrall online ]")
+
+
+def _configure_logging() -> None:
+    log_dir = Path(__file__).parent.parent / "logs"
+    log_dir.mkdir(exist_ok=True)
+
+    fmt = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    file_handler = logging.FileHandler(log_dir / "thrall.log", encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(fmt)
+
+    err_handler = logging.FileHandler(log_dir / "thrall_err.log", encoding="utf-8")
+    err_handler.setLevel(logging.ERROR)
+    err_handler.setFormatter(fmt)
+
+    root = logging.getLogger()
+    if not root.handlers:
+        root.setLevel(logging.DEBUG)
+        root.addHandler(file_handler)
+        root.addHandler(err_handler)
 
 
 def reload() -> None:

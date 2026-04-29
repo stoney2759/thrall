@@ -17,6 +17,7 @@ from commands.compact_cancel import CompactCancelCommand
 from commands.profile import ProfileCommand
 from commands.cron import CronCommand
 from commands.heartbeat import HeartbeatCommand
+from commands.stop import StopCommand
 
 _COMMANDS: dict[str, Command] = {
     cmd.name(): cmd
@@ -38,6 +39,7 @@ _COMMANDS: dict[str, Command] = {
         ProfileCommand(),
         CronCommand(),
         HeartbeatCommand(),
+        StopCommand(),
     ]
 }
 
