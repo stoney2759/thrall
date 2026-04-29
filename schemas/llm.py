@@ -11,11 +11,24 @@ class ToolCallRequest:
 
 
 @dataclass
+class LLMUsage:
+    """Token usage from an LLM response."""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    reasoning_tokens: int = 0
+    cached_tokens: int = 0
+
+
+@dataclass
 class LLMResponse:
     """Structured response from any LLM provider."""
     content: str | None
     tool_calls: list[ToolCallRequest] = field(default_factory=list)
     finish_reason: str = "stop"
+    reasoning: str | None = None
+    reasoning_details: list[dict] = field(default_factory=list)
+    usage: LLMUsage = field(default_factory=LLMUsage)
 
     @property
     def has_tool_calls(self) -> bool:
@@ -24,3 +37,7 @@ class LLMResponse:
     @property
     def is_final(self) -> bool:
         return not self.has_tool_calls
+
+    @property
+    def was_truncated(self) -> bool:
+        return self.finish_reason == "length"

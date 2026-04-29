@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -11,7 +12,7 @@ from services import session_memory
 from services.memory.router import get_store
 from thrall import context
 from thrall.tools import registry as tools
-from hooks import input_gate, output_gate, tool_gate, audit
+from hooks import input_gate, output_gate, tool_gate, audit, session_log
 from bootstrap import state
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ async def receive(message: Message) -> str:
 
     # Add user turn to session memory
     session_memory.append(clean_message.session_id, clean_message.role, clean_message.content)
+    session_log.log_message(str(clean_message.session_id), "user", clean_message.content)
 
     # Auto-compact if session context is approaching the token threshold
     _auto_compact_note = await _maybe_auto_compact(clean_message.session_id)
@@ -55,14 +57,23 @@ async def receive(message: Message) -> str:
     # Get tool definitions scoped to Thrall (full access)
     tool_defs = tools.get_definitions()
 
-    # Agentic reasoning loop
+    # Agentic reasoning loop — wrapped in a tracked task so /stop can cancel it
     try:
-        response = await _reason(ctx_messages, tool_defs, clean_message)
+        task = asyncio.create_task(_reason(ctx_messages, tool_defs, clean_message))
+        state.register_task(str(clean_message.session_id), task)
+        try:
+            response = await task
+        except asyncio.CancelledError:
+            session_log.log_message(str(clean_message.session_id), "system", "Task cancelled by user")
+            return "Stopped."
+        finally:
+            state.unregister_task(str(clean_message.session_id))
     except Exception as e:
         logger.error(f"Reasoning failed for session {clean_message.session_id}: {e}", exc_info=True)
         state.log_error(f"Coordinator reasoning failed: {e}")
         audit.log_deny("coordinator", reason=f"reasoning failed: {type(e).__name__}: {e}")
-        return "I encountered an error processing your request. Please try again."
+        session_log.log_error(str(clean_message.session_id), str(e))
+        return f"Error: {e}"
 
     # Gate 5 — output validation
     out = output_gate.run(response)
@@ -75,6 +86,7 @@ async def receive(message: Message) -> str:
 
     # Persist assistant response
     session_memory.append(clean_message.session_id, Role.ASSISTANT, final)
+    session_log.log_message(str(clean_message.session_id), "assistant", final)
     try:
         await store.write_episode(Episode(
             session_id=clean_message.session_id,
@@ -98,13 +110,25 @@ async def _reason(
     for iteration in range(_MAX_TOOL_ITERATIONS):
         llm_response: LLMResponse = await llm.complete_with_tools(messages, tool_defs)
 
+        if llm_response.usage.total_tokens:
+            logger.debug(
+                "Iteration %d — total=%d reasoning=%d cached=%d",
+                iteration, llm_response.usage.total_tokens,
+                llm_response.usage.reasoning_tokens, llm_response.usage.cached_tokens,
+            )
+
+        # Truncated response — ask model to continue from where it left off
+        if llm_response.was_truncated:
+            logger.warning("Response truncated at iteration %d — requesting continuation", iteration)
+            messages.append(_assistant_message(llm_response))
+            messages.append({"role": "user", "content": "Your response was cut off. Please continue from where you left off."})
+            continue
+
         # Final response — no tool calls
         if llm_response.is_final:
-            # Gemini sometimes returns empty content after tool use — substitute a neutral fallback
-            # so output_gate doesn't block and the user gets an honest confirmation
             return llm_response.content or "Done."
 
-        # Add assistant message with tool calls to context
+        # Add assistant message with tool calls to context (includes reasoning for roundtrip)
         messages.append(_assistant_message(llm_response))
 
         # Execute each tool call
@@ -119,13 +143,16 @@ async def _reason(
             # Gate 3 — tool permission
             if not tool_gate.is_allowed(tool_call):
                 messages.append(_tool_result_message(tc.id, "denied: tool gate blocked this call"))
+                session_log.log_tool_result(str(message.session_id), tc.name, "denied: tool gate blocked this call")
                 continue
 
             # Execute
+            session_log.log_tool_call(str(message.session_id), tc.name, tc.args)
             result = await tools.execute(tc.name, tc.args, message.session_id, "thrall")
             output = result.output or result.error or "(no output)"
 
             audit.log_allow("tool_gate", tool_call, reason=f"executed in {result.duration_ms}ms")
+            session_log.log_tool_result(str(message.session_id), tc.name, result.output, result.error, result.duration_ms)
             messages.append(_tool_result_message(tc.id, output))
 
     # Exceeded max iterations — ask for a final response without tools
@@ -160,10 +187,10 @@ async def _maybe_auto_compact(session_id) -> str | None:
 
 
 def _assistant_message(response: LLMResponse) -> dict:
-    return {
-        "role": "assistant",
-        "content": response.content,
-        "tool_calls": [
+    msg: dict = {"role": "assistant", "content": response.content}
+
+    if response.tool_calls:
+        msg["tool_calls"] = [
             {
                 "id": tc.id,
                 "type": "function",
@@ -173,8 +200,9 @@ def _assistant_message(response: LLMResponse) -> dict:
                 },
             }
             for tc in response.tool_calls
-        ],
-    }
+        ]
+
+    return msg
 
 
 def _tool_result_message(tool_call_id: str, content: str) -> dict:

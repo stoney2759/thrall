@@ -269,8 +269,8 @@ async def cmd_cost(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 _voice_mode: set[int] = set()  # user IDs with voice mode enabled
 
 _SPEAK_TRIGGERS = (
-    "say it", "say that", "read that", "read it", "speak", "tell me",
     "read aloud", "say aloud", "speak that", "out loud", "voice that",
+    "say it aloud", "read it aloud",
 )
 
 
@@ -319,6 +319,22 @@ async def cmd_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
     response = await dispatch("profile", ctx)
     await update.message.reply_text(response or "No profile info.")
+
+
+async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_allowed(update):
+        return
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(
+        user_id=str(user.id),
+        session_id=_session_id(user.id),
+        transport=Transport.TELEGRAM,
+        args=[],
+    )
+    response = await dispatch("stop", ctx)
+    await update.message.reply_text(response or "Done.")
 
 
 # ── Commands for voice mode ───────────────────────────────────────────────────
@@ -564,6 +580,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("compact_cancel", cmd_compact_cancel))
     app.add_handler(CommandHandler("profile", cmd_profile))
     app.add_handler(CommandHandler("voice", cmd_voice))
+    app.add_handler(CommandHandler("stop", cmd_stop))
 
     # Voice and audio messages
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
@@ -648,6 +665,7 @@ async def set_commands(app: Application) -> None:
         BotCommand("compact_cancel", "Discard compact draft"),
         BotCommand("profile", "Show or switch personality profile: /profile [name]"),
         BotCommand("voice", "Toggle voice mode on/off"),
+        BotCommand("stop", "Cancel the currently running task"),
     ])
     from scheduler import runner
     runner.start(app.bot)

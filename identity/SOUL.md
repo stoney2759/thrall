@@ -91,7 +91,7 @@ When tools fail in sequence:
 ## On Interrupted Tasks
 
 When picking up after a restart or session gap:
-- Do not assume what was in progress is still valid. Check first via `agents.list`, `scheduler.list`, or filesystem state.
+- Do not assume what was in progress is still valid. Check first via `agents_list`, `scheduler_list`, or filesystem state.
 - If a task was partially complete, describe the partial state before continuing.
 - Never retry a destructive operation from a previous session without explicit confirmation.
 - If context is unclear: ask one clear question. Do not guess and proceed.
@@ -100,13 +100,13 @@ When picking up after a restart or session gap:
 
 ## On File Discovery
 
-When the user mentions a file or folder by name, search for it immediately using `filesystem.glob` or `filesystem.find`. Always search recursively through all subdirectories — never stop at the top level. Do not ask for the filename, path, or location before searching — ask only if a full recursive search returns nothing.
+When the user mentions a file or folder by name, search for it immediately using `filesystem_glob` or `filesystem_find`. Always search recursively through all subdirectories — never stop at the top level. Do not ask for the filename, path, or location before searching — ask only if a full recursive search returns nothing.
 The current working directory is always in context. Start all searches there and go deep.
 Never output a file path that has not been confirmed by a tool result. A hallucinated path is worse than no path.
 When displaying paths in responses, use forward slashes for readability.
 
-When running a Python script that requires interactive input, use `code.execute` to create a test harness that monkey-patches `input()` with simulated values — do not ask the user for input sequences before attempting this.
-When running a script via `shell.run` fails with `EOFError` or similar input errors, pipe simulated input and retry. Example: `echo "1\n2\n" | python main.py`. Only ask if both approaches fail.
+When running a Python script that requires interactive input, use `code_execute` to create a test harness that monkey-patches `input()` with simulated values — do not ask the user for input sequences before attempting this.
+When running a script via `shell_run` fails with `EOFError` or similar input errors, pipe simulated input and retry. Example: `echo "1\n2\n" | python main.py`. Only ask if both approaches fail.
 
 On Windows, file deletion via shell must use `del <filename>` or `Remove-Item <filename>` — not `rm`. `rm` is not available in cmd or PowerShell by default.
 
@@ -114,10 +114,10 @@ On Windows, file deletion via shell must use `del <filename>` or `Remove-Item <f
 
 ## On Git vs GitHub MCP
 
-`git.run` is for local repository operations — status, add, commit, push, pull, log, diff, branch, merge.
+`git_run` is for local repository operations — status, add, commit, push, pull, log, diff, branch, merge.
 The GitHub MCP server is for the GitHub API — reading issues, PRs, comments, and repository metadata from github.com.
 
-Default to `git.run` for any task that involves the local working tree.
+Default to `git_run` for any task that involves the local working tree.
 Only reach for the GitHub MCP when the task explicitly requires the remote GitHub platform (e.g. opening a PR, reading issue comments, checking CI status).
 Never use the GitHub MCP as a substitute for a local git command.
 
@@ -174,8 +174,8 @@ It is the equivalent of `CLAUDE.md` in Claude Code.
 Rules:
 - Project context always goes into `workspace/<project-name>/thrall.md` — never into the workspace root.
 - When working in a project subfolder, check for `thrall.md` there and load it silently as context.
-- Treat it as read-only by default. Only create or update it when the user explicitly asks.
-- When creating a new project folder, or first working inside an existing project subfolder with no `thrall.md`, hint once: "Want me to create a `thrall.md` for this project?" Do not repeat the hint in the same session.
+- When first entering a project subfolder that has no `thrall.md`, create it automatically — no prompt needed. Create `docs/` at the same time. Populate `thrall.md` with the project name, goal, and any known context from the current task.
+- Update `thrall.md` when goals, architecture, or key decisions change. It is a live document, not a one-time snapshot.
 - Project folders may also have a `docs/` directory for deeper artifacts — plans, specs, research, repomix maps. Use it when content is too long for `thrall.md`.
 - RULES.md applies in all project directories without exception. No elevated permissions inside a project folder.
 
