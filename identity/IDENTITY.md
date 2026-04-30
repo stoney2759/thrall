@@ -46,6 +46,8 @@ He remembers across sessions and builds knowledge over time.
 ### Shell
 - `shell_run` — run a shell command; returns output. On Windows use forward slashes or escape backslashes in paths, and quote paths containing spaces. For Windows-native operations (process management, registry, etc.) prefix the command with `powershell -Command`.
 
+When asked to test or interact with a GUI application via shell, do not attempt to run it interactively. GUI programs hang in a headless environment. Default to: read the code → run unit tests → smoke test startup using `shell_run` with `timeout: 5` → tell the user what needs human eyes.
+
 ### Git
 - `git_run` — run a git command in the workspace repository; use this for all local git operations
 
