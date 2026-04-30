@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import os
+import subprocess
 import sys
 import time
 from uuid import UUID
@@ -9,6 +10,19 @@ from schemas.tool import ToolCall, ToolResult
 
 _DEFAULT_TIMEOUT = 300
 _MAX_OUTPUT = 16_000
+
+
+def _run_sync(command: str, cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
+    result = subprocess.run(
+        command,
+        shell=True,
+        capture_output=True,
+        text=True,
+        cwd=cwd,
+        timeout=timeout,
+        env=env,
+    )
+    return result.returncode, result.stdout, result.stderr
 
 
 async def execute(call: ToolCall) -> ToolResult:
@@ -26,33 +40,19 @@ async def execute(call: ToolCall) -> ToolResult:
     env["PATH"] = scripts_dir + os.pathsep + env.get("PATH", "")
 
     try:
-        proc = await asyncio.create_subprocess_shell(
-            command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=cwd,
-            env=env,
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
-            try:
-                proc.kill()
-            except ProcessLookupError:
-                pass
-            return _result(call.id, error=f"timed out after {timeout}s", start=start)
+        returncode, out, err = await asyncio.to_thread(_run_sync, command, cwd, timeout, env)
+    except subprocess.TimeoutExpired:
+        return _result(call.id, error=f"timed out after {timeout}s", start=start)
     except Exception as e:
         return _result(call.id, error=str(e), start=start)
 
-    out = stdout.decode(errors="replace").strip()
-    err = stderr.decode(errors="replace").strip()
     combined = out
     if err:
         combined += f"\n[stderr]\n{err}"
     combined = combined[:_MAX_OUTPUT]
 
-    if proc.returncode != 0:
-        return _result(call.id, error=f"exit {proc.returncode}\n{combined}", start=start)
+    if returncode != 0:
+        return _result(call.id, error=f"exit {returncode}\n{combined}", start=start)
 
     return _result(call.id, output=combined or "(no output)", start=start)
 
