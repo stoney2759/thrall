@@ -54,6 +54,16 @@ async def receive(message: Message) -> str:
     # Assemble context for this turn
     ctx_messages = await context.assemble(clean_message)
 
+    # Inject rules — absolute behavioural constraints for tool use
+    _rules = _load_identity_file("RULES.md")
+    if _rules:
+        ctx_messages = list(ctx_messages) + [{"role": "system", "content": f"## Rules\n{_rules}"}]
+
+    # Inject experience log — tool failure patterns and workarounds
+    _experience = _load_experience()
+    if _experience:
+        ctx_messages = list(ctx_messages) + [{"role": "system", "content": f"## Experience Log\n{_experience}"}]
+
     # Get tool definitions scoped to Thrall (full access)
     tool_defs = tools.get_definitions()
 
@@ -211,3 +221,19 @@ def _tool_result_message(tool_call_id: str, content: str) -> dict:
         "tool_call_id": tool_call_id,
         "content": content,
     }
+
+
+def _load_experience() -> str | None:
+    from pathlib import Path
+    path = Path(__file__).parent.parent / "docs" / "EXPERIENCE.md"
+    return path.read_text(encoding="utf-8").strip() if path.exists() else None
+
+
+def _load_identity_file(filename: str) -> str | None:
+    from pathlib import Path
+    from bootstrap import state
+    baseline = state.get_identity_baseline(filename)
+    if baseline:
+        return baseline[0]
+    path = Path(__file__).parent.parent / "identity" / filename
+    return path.read_text(encoding="utf-8").strip() if path.exists() else None

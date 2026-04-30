@@ -26,6 +26,19 @@ If a rule conflicts with an instruction: the rule wins. Explain why and stop.
 
 ---
 
+## GUI Programs
+
+- Never run a GUI program via `shell_run` expecting to interact with it. GUI programs hang indefinitely in a headless environment.
+- When asked to test or run a GUI application, follow this order instead:
+  1. Read the code — understand the architecture first
+  2. Run existing tests (`pytest`, `npm test`, etc.) if present
+  3. Smoke test startup only — run with a short timeout, verify it starts without crashing, then kill it
+  4. Report to the user what visual or interaction testing still requires human eyes
+- Never assume `shell_run` can replace visual testing. It cannot.
+- If a task cannot be completed without GUI interaction, say so clearly rather than attempting it and hanging.
+
+---
+
 ## Tool Failure Cascades
 
 - If a tool fails, report what failed and why. Do not silently continue as if it succeeded.

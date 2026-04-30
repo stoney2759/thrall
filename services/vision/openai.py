@@ -5,7 +5,7 @@ import httpx
 from bootstrap import state
 
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-_VISION_MODEL = "google/gemini-2.5-flash"
+_VISION_MODEL = "google/gemini-2.5-flash"  # fallback if config missing
 
 
 async def describe(image_bytes: bytes, media_type: str = "image/jpeg", prompt: str = "") -> str:
@@ -13,7 +13,11 @@ async def describe(image_bytes: bytes, media_type: str = "image/jpeg", prompt: s
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY not set")
 
-    model = state.get_model_override() or state.get_config().get("llm", {}).get("model", _VISION_MODEL)
+    vision_cfg = state.get_config().get("vision", {})
+    model = vision_cfg.get("model", _VISION_MODEL)
+    max_tokens = int(vision_cfg.get("max_tokens", 1024))
+    timeout = float(vision_cfg.get("timeout", 60))
+
     b64 = base64.b64encode(image_bytes).decode()
     user_prompt = prompt or "Describe this image in detail. If it contains text, transcribe it exactly."
 
@@ -28,10 +32,10 @@ async def describe(image_bytes: bytes, media_type: str = "image/jpeg", prompt: s
                 ],
             }
         ],
-        "max_tokens": 1024,
+        "max_tokens": max_tokens,
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(
             _OPENROUTER_URL,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},

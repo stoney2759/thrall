@@ -19,8 +19,8 @@ _XML_TOOL_RE = re.compile(
 )
 _PARAM_RE = re.compile(r"<parameter=([^>]+)>(.*?)</parameter>", re.DOTALL)
 
-_MAX_RETRIES = 3
-_RETRY_BASE = 5  # seconds — doubles each attempt: 5, 10, 20
+_MAX_RETRIES = 3       # fallback if config not loaded
+_RETRY_BASE = 5        # fallback if config not loaded
 
 
 # ── OpenRouter error taxonomy ──────────────────────────────────────────────────
@@ -82,14 +82,15 @@ def _check_body(data: dict) -> None:
 # ── HTTP layer ─────────────────────────────────────────────────────────────────
 
 async def _post_with_retry(
-    client: httpx.AsyncClient, url: str, headers: dict, payload: dict, model: str = ""
+    client: httpx.AsyncClient, url: str, headers: dict, payload: dict, model: str = "",
+    max_retries: int = _MAX_RETRIES, retry_base: int = _RETRY_BASE,
 ) -> httpx.Response:
-    for attempt in range(_MAX_RETRIES):
+    for attempt in range(max_retries):
         response = await client.post(url, headers=headers, json=payload)
 
         if response.status_code == 429:
-            wait = _RETRY_BASE * (2 ** attempt)
-            logger.warning("OpenRouter rate limit (model=%s) — retrying in %ss (attempt %d/%d)", model, wait, attempt + 1, _MAX_RETRIES)
+            wait = retry_base * (2 ** attempt)
+            logger.warning("OpenRouter rate limit (model=%s) — retrying in %ss (attempt %d/%d)", model, wait, attempt + 1, max_retries)
             await asyncio.sleep(wait)
             continue
 
@@ -226,6 +227,11 @@ class OpenRouterProvider(LLMProvider):
     def __init__(self, api_key: str | None = None, base_url: str = "https://openrouter.ai/api/v1") -> None:
         self._api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
         self._base_url = base_url
+        llm_cfg = state.get_config().get("llm", {})
+        self._request_timeout = float(llm_cfg.get("request_timeout", 120))
+        self._tool_timeout = float(llm_cfg.get("tool_timeout", 300))
+        self._max_retries = int(llm_cfg.get("max_retries", _MAX_RETRIES))
+        self._retry_base = int(llm_cfg.get("retry_base_seconds", _RETRY_BASE))
 
     def name(self) -> str:
         return "openrouter"
@@ -268,9 +274,9 @@ class OpenRouterProvider(LLMProvider):
 
     async def complete(self, messages: list[dict], model: str, temperature: float, max_tokens: int) -> str:
         logger.debug("OpenRouter complete — model=%s messages=%d", model, len(messages))
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=self._request_timeout) as client:
             payload = self._base_payload(model, messages, temperature, max_tokens)
-            response = await _post_with_retry(client, f"{self._base_url}/chat/completions", self._headers(), payload, model)
+            response = await _post_with_retry(client, f"{self._base_url}/chat/completions", self._headers(), payload, model, self._max_retries, self._retry_base)
             data = response.json()
             usage = _parse_usage(data)
             logger.debug("OpenRouter complete usage — total=%d reasoning=%d cached=%d", usage.total_tokens, usage.reasoning_tokens, usage.cached_tokens)
@@ -280,16 +286,16 @@ class OpenRouterProvider(LLMProvider):
         self, messages: list[dict], tools: list[dict], model: str, temperature: float, max_tokens: int,
     ) -> LLMResponse:
         logger.debug("OpenRouter complete_with_tools — model=%s messages=%d tools=%d", model, len(messages), len(tools))
-        async with httpx.AsyncClient(timeout=600.0) as client:
+        async with httpx.AsyncClient(timeout=self._tool_timeout) as client:
             payload = self._base_payload(model, messages, temperature, max_tokens)
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
-            response = await _post_with_retry(client, f"{self._base_url}/chat/completions", self._headers(), payload, model)
+            response = await _post_with_retry(client, f"{self._base_url}/chat/completions", self._headers(), payload, model, self._max_retries, self._retry_base)
             return _parse_llm_response(response.json())
 
     async def stream(self, messages: list[dict], model: str, temperature: float, max_tokens: int) -> AsyncIterator[str]:
         logger.debug("OpenRouter stream — model=%s", model)
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=self._request_timeout) as client:
             payload = self._base_payload(model, messages, temperature, max_tokens)
             payload["stream"] = True
             async with client.stream(
