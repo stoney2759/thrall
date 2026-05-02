@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import asyncio
 import subprocess
 import sys
@@ -57,7 +57,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "code.execute"
+NAME = "code_execute"
 DESCRIPTION = "Execute Python code in a subprocess sandbox. Output is captured and returned."
 PARAMETERS = {
     "code": {"type": "string", "required": True},

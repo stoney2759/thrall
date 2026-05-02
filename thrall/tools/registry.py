@@ -22,6 +22,8 @@ from thrall.tools.documents import read_pdf as doc_read_pdf, read_docx as doc_re
 from thrall.tools.browser import navigate as browser_navigate, screenshot as browser_screenshot, click as browser_click, fill as browser_fill, extract as browser_extract, close as browser_close
 from thrall.tools.audio import generate as audio_generate
 from thrall.tools.profile import switch as profile_switch
+from thrall.tools.video import download as video_download
+from thrall.tools.video import ffmpeg as video_ffmpeg
 from thrall.tools.audit_hook import before_call, after_call
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -73,6 +75,8 @@ _TOOLS: dict = {
     browser_close.NAME: browser_close.execute,
     audio_generate.NAME: audio_generate.execute,
     profile_switch.NAME: profile_switch.execute,
+    video_download.NAME: video_download.execute,
+    video_ffmpeg.NAME: video_ffmpeg.execute,
 }
 
 _SCHEMAS: dict = {
@@ -122,18 +126,14 @@ _SCHEMAS: dict = {
     browser_close.NAME: (browser_close.DESCRIPTION, browser_close.PARAMETERS),
     audio_generate.NAME: (audio_generate.DESCRIPTION, audio_generate.PARAMETERS),
     profile_switch.NAME: (profile_switch.DESCRIPTION, profile_switch.PARAMETERS),
+    video_download.NAME: (video_download.DESCRIPTION, video_download.PARAMETERS),
+    video_ffmpeg.NAME: (video_ffmpeg.DESCRIPTION, video_ffmpeg.PARAMETERS),
 }
 
 
 _MCP_TOOLS: dict[str, dict] = {}  # name -> full OpenAI-format tool definition
 _MCP_EXECUTORS: dict[str, str] = {}  # name -> server_name (for routing)
 
-# Dots are not valid in OpenAI function names (spec: ^[a-zA-Z0-9_-]+$).
-# We send underscore names to the API and map them back to internal dot names.
-_API_TO_INTERNAL: dict[str, str] = {
-    name.replace(".", "_"): name
-    for name in _SCHEMAS
-}
 
 
 def register_mcp_tools(tool_defs: list[dict]) -> None:
@@ -153,7 +153,6 @@ def get_definitions(allowed: list[str] | None = None) -> list[dict]:
 
 
 def _to_openai_def(name: str) -> dict:
-    api_name = name.replace(".", "_")
     description, parameters = _SCHEMAS[name]
     required = [k for k, v in parameters.items() if v.get("required", False)]
     properties = {
@@ -163,7 +162,7 @@ def _to_openai_def(name: str) -> dict:
     return {
         "type": "function",
         "function": {
-            "name": api_name,
+            "name": name,
             "description": description,
             "parameters": {
                 "type": "object",
@@ -190,11 +189,8 @@ async def execute(name: str, args: dict, session_id: UUID, caller: str) -> ToolR
             duration = int((time.monotonic() - start) * 1000)
             return ToolResult(call_id=uuid4(), error=str(e), duration_ms=duration)
 
-    # Resolve API name (underscore) → internal name (dot)
-    name = _API_TO_INTERNAL.get(name, name)
-
     if name not in _TOOLS:
-        # Last-resort: short-name recovery for context drift (e.g. "ls" → "filesystem.ls")
+        # Last-resort: short-name recovery for context drift (e.g. "ls" → "filesystem_ls")
         short_index = _short_name_index()
         if name in short_index and len(short_index[name]) == 1:
             resolved = next(iter(short_index[name]))
@@ -218,10 +214,10 @@ async def execute(name: str, args: dict, session_id: UUID, caller: str) -> ToolR
 
 
 def _short_name_index() -> dict[str, set[str]]:
-    """Map bare name (after last dot) → set of full names. Used for drift recovery."""
+    """Map bare name (after last underscore) → set of full names. Used for drift recovery."""
     index: dict[str, set[str]] = {}
     for full_name in _TOOLS:
-        short = full_name.rsplit(".", 1)[-1]
+        short = full_name.rsplit("_", 1)[-1]
         index.setdefault(short, set()).add(full_name)
     return index
 

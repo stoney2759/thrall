@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -99,7 +99,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "system.info"
+NAME = "system_info"
 DESCRIPTION = "Query system metrics. metric can be: cpu, memory, disk, processes, or all (default). Use to monitor system health or diagnose performance issues."
 PARAMETERS = {
     "metric":  {"type": "string",  "required": False, "default": "all"},

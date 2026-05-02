@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
 from thrall.tools.filesystem._resolve import resolve, is_protected
@@ -30,7 +30,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "filesystem.append"
+NAME = "filesystem_append"
 DESCRIPTION = "Append content to a file. Creates the file if it does not exist. Adds a newline before content if the file already has content."
 PARAMETERS = {
     "path": {"type": "string", "required": True},

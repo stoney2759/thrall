@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import re
 import time
 from uuid import UUID
@@ -60,7 +60,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "filesystem.find"
+NAME = "filesystem_find"
 DESCRIPTION = "Find files and directories by name pattern, type, size, or extension."
 PARAMETERS = {
     "path": {"type": "string", "required": False, "default": "."},

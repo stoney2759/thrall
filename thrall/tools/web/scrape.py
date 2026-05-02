@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import re
 import time
 from uuid import UUID
@@ -41,7 +41,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "web.scrape"
+NAME = "web_scrape"
 DESCRIPTION = "Fetch a URL and extract readable text, stripping HTML tags."
 PARAMETERS = {
     "url": {"type": "string", "required": True},

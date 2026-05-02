@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -35,7 +35,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "clipboard.snippets"
+NAME = "clipboard_snippets"
 DESCRIPTION = "List all saved snippets with a preview, or delete one by name."
 PARAMETERS = {
     "action": {"type": "string", "required": False, "default": "list"},

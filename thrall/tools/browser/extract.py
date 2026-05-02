@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -71,7 +71,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "browser.extract"
+NAME = "browser_extract"
 DESCRIPTION = "Extract content from the current browser page. mode: text (default), links, tables, or all. Use selector to narrow to a specific element."
 PARAMETERS = {
     "mode":      {"type": "string",  "required": False, "default": "text"},

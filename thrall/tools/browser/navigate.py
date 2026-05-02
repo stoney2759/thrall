@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -36,7 +36,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "browser.navigate"
+NAME = "browser_navigate"
 DESCRIPTION = "Navigate the browser to a URL. Returns page title and final URL after redirect. Call this first before any other browser tools."
 PARAMETERS = {
     "url":      {"type": "string", "required": True},

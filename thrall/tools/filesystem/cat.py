@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -29,7 +29,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "filesystem.cat"
+NAME = "filesystem_cat"
 DESCRIPTION = "Output full file contents without line numbers."
 PARAMETERS = {
     "path": {"type": "string", "required": True},

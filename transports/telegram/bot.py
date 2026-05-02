@@ -337,6 +337,30 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(response or "Done.")
 
 
+async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_allowed(update):
+        return
+    await update.message.chat.send_action(ChatAction.TYPING)
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(
+        user_id=str(user.id),
+        session_id=_session_id(user.id),
+        transport=Transport.TELEGRAM,
+        args=[],
+    )
+    response = await dispatch("approve", ctx)
+    if not response:
+        await update.message.reply_text("Nothing to approve.")
+        return
+    use_audio = user.id in _voice_mode
+    if use_audio:
+        await _send_audio(update, response)
+    else:
+        await _send(update, response)
+
+
 # ── Commands for voice mode ───────────────────────────────────────────────────
 
 async def cmd_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -558,7 +582,11 @@ def build_application() -> Application:
     if not token:
         raise ValueError("TELEGRAM_BOT_TOKEN environment variable not set")
 
-    app = Application.builder().token(token).build()
+    # concurrent_updates=True lets /stop and other commands be dispatched
+    # while a long-running receive() is still awaiting on another handler.
+    # Without this, the bot processes updates sequentially and /stop cannot
+    # interrupt an in-progress reasoning loop.
+    app = Application.builder().token(token).concurrent_updates(True).build()
 
     # Commands
     app.add_handler(CommandHandler("start", cmd_start))
@@ -581,6 +609,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("profile", cmd_profile))
     app.add_handler(CommandHandler("voice", cmd_voice))
     app.add_handler(CommandHandler("stop", cmd_stop))
+    app.add_handler(CommandHandler("approve", cmd_approve))
 
     # Voice and audio messages
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
@@ -666,6 +695,7 @@ async def set_commands(app: Application) -> None:
         BotCommand("profile", "Show or switch personality profile: /profile [name]"),
         BotCommand("voice", "Toggle voice mode on/off"),
         BotCommand("stop", "Cancel the currently running task"),
+        BotCommand("approve", "Approve a pending proposal and execute"),
     ])
     from scheduler import runner
     runner.start(app.bot)

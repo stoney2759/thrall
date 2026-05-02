@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import re
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -60,7 +60,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     )
 
 
-NAME = "filesystem.grep"
+NAME = "filesystem_grep"
 DESCRIPTION = "Search file contents using regex. Returns matching lines with file path and line number."
 PARAMETERS = {
     "pattern": {"type": "string", "required": True},

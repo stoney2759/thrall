@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
 from thrall.tools.filesystem._resolve import resolve, is_protected, filter_protected
@@ -29,7 +29,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     )
 
 
-NAME = "filesystem.glob"
+NAME = "filesystem_glob"
 DESCRIPTION = "Find files matching a glob pattern, sorted by modification time."
 PARAMETERS = {
     "pattern": {"type": "string", "required": True},

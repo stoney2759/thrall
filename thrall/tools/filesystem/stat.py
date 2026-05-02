@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from datetime import datetime, timezone
 from uuid import UUID
@@ -49,7 +49,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "filesystem.stat"
+NAME = "filesystem_stat"
 DESCRIPTION = "Get file or directory metadata: size, type, timestamps, permissions."
 PARAMETERS = {
     "path": {"type": "string", "required": True},

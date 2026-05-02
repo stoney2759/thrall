@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime, timezone
 from uuid import UUID
 from schemas.memory import SessionMemory
 from schemas.message import Role
@@ -35,3 +36,15 @@ def estimate_tokens(session_id: UUID) -> int:
     """Rough token estimate for the session context (4 chars ≈ 1 token)."""
     context = get_or_create(session_id).context
     return sum(len(str(msg.get("content", ""))) for msg in context) // 4
+
+
+def set_execution_mode(session_id: UUID) -> None:
+    session = get_or_create(session_id)
+    session.execution_mode = True
+    session.execution_mode_started_at = datetime.now(timezone.utc)
+
+
+def clear_execution_mode(session_id: UUID) -> None:
+    session = get_or_create(session_id)
+    session.execution_mode = False
+    session.execution_mode_started_at = None

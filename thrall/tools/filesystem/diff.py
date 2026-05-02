@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import difflib
 import time
 from uuid import UUID
@@ -43,7 +43,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "filesystem.diff"
+NAME = "filesystem_diff"
 DESCRIPTION = "Diff two files or two text strings. Returns unified diff format."
 PARAMETERS = {
     "path_a": {"type": "string", "required": False},
