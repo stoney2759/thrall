@@ -188,9 +188,112 @@ async def execute(call: ToolCall) -> ToolResult:
             
             return _result(call.id, output=f"Extracted thumbnail from {input_path} at {timestamp} to {output_path}", start=start)
         
+        elif operation == "extract_frames":
+            output_dir = call.args.get("output_dir", "")
+            interval = int(call.args.get("interval", 30))
+            scale_width = int(call.args.get("scale_width", 1280))
+            frame_format = call.args.get("frame_format", "jpg")
+
+            if not output_dir:
+                base_name = os.path.splitext(os.path.basename(input_path))[0]
+                output_dir = os.path.join(os.path.dirname(input_path), f"{base_name}_frames")
+            elif workspace_dir and not os.path.isabs(output_dir):
+                output_dir = os.path.join(workspace_dir, output_dir)
+
+            os.makedirs(output_dir, exist_ok=True)
+            output_pattern = os.path.join(output_dir, f"frame_%04d.{frame_format}")
+            vf_filter = f"fps=1/{interval},scale={scale_width}:-1"
+
+            args = ["-i", input_path, "-vf", vf_filter, output_pattern]
+            returncode, out, err = await asyncio.to_thread(_run_ffmpeg, args, None, timeout, env)
+
+            if returncode != 0:
+                return _result(call.id, error=f"ffmpeg extract_frames failed (code {returncode})\n{err[:2000]}", start=start)
+
+            frame_files = sorted(f for f in os.listdir(output_dir) if f.startswith("frame_"))
+            return _result(call.id, output=f"Extracted {len(frame_files)} frames to {output_dir}\nFiles: {', '.join(frame_files)}", start=start)
+
+        elif operation == "concat":
+            input_paths = call.args.get("input_paths", [])
+            if not input_paths:
+                return _result(call.id, error="input_paths is required for concat", start=start)
+            if not output_path:
+                return _result(call.id, error="output_path is required for concat", start=start)
+
+            resolved = []
+            for p in input_paths:
+                if workspace_dir and not os.path.isabs(p):
+                    p = os.path.join(workspace_dir, p)
+                resolved.append(p)
+
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+                for p in resolved:
+                    f.write(f"file '{p}'\n")
+                concat_file = f.name
+
+            try:
+                args = ["-f", "concat", "-safe", "0", "-i", concat_file, "-c", "copy", output_path]
+                returncode, out, err = await asyncio.to_thread(_run_ffmpeg, args, None, timeout, env)
+            finally:
+                os.unlink(concat_file)
+
+            if returncode != 0:
+                return _result(call.id, error=f"ffmpeg concat failed (code {returncode})\n{err[:2000]}", start=start)
+
+            return _result(call.id, output=f"Concatenated {len(resolved)} files to {output_path}", start=start)
+
+        elif operation == "compress":
+            if not output_path:
+                base_name = os.path.splitext(os.path.basename(input_path))[0]
+                ext = os.path.splitext(input_path)[1]
+                output_path = os.path.join(os.path.dirname(input_path), f"{base_name}_compressed{ext}")
+
+            video_crf = int(call.args.get("video_crf", 28))
+            audio_bitrate = call.args.get("audio_bitrate", "128k")
+            scale_width = call.args.get("scale_width", None)
+
+            args = ["-i", input_path]
+            if scale_width:
+                args.extend(["-vf", f"scale={scale_width}:-1"])
+            args.extend(["-c:v", "libx264", "-crf", str(video_crf), "-c:a", "aac", "-b:a", audio_bitrate, output_path])
+
+            returncode, out, err = await asyncio.to_thread(_run_ffmpeg, args, None, timeout, env)
+
+            if returncode != 0:
+                return _result(call.id, error=f"ffmpeg compress failed (code {returncode})\n{err[:2000]}", start=start)
+
+            try:
+                orig = os.path.getsize(input_path)
+                comp = os.path.getsize(output_path)
+                pct = 100 - (comp / orig * 100)
+                return _result(call.id, output=f"Compressed to {output_path}\n{orig // 1024}KB → {comp // 1024}KB ({pct:.0f}% reduction)", start=start)
+            except Exception:
+                return _result(call.id, output=f"Compressed {input_path} to {output_path}", start=start)
+
+        elif operation == "gif":
+            if not output_path:
+                base_name = os.path.splitext(os.path.basename(input_path))[0]
+                output_path = os.path.join(os.path.dirname(input_path), f"{base_name}.gif")
+
+            gif_fps = int(call.args.get("gif_fps", 10))
+            gif_width = int(call.args.get("gif_width", 480))
+            gif_start = call.args.get("start_time", "00:00:00")
+            gif_duration = call.args.get("duration", "5")
+
+            vf_filter = f"fps={gif_fps},scale={gif_width}:-1:flags=lanczos"
+            args = ["-i", input_path, "-ss", str(gif_start), "-t", str(gif_duration), "-vf", vf_filter, output_path]
+
+            returncode, out, err = await asyncio.to_thread(_run_ffmpeg, args, None, timeout, env)
+
+            if returncode != 0:
+                return _result(call.id, error=f"ffmpeg gif failed (code {returncode})\n{err[:2000]}", start=start)
+
+            return _result(call.id, output=f"Created GIF at {output_path}", start=start)
+
         else:
             return _result(call.id, error=f"unknown operation: {operation}", start=start)
-    
+
     except subprocess.TimeoutExpired:
         return _result(call.id, error=f"operation timed out after {timeout}s", start=start)
     except Exception as e:
@@ -203,65 +306,126 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
 
 
 NAME = "video_ffmpeg"
-DESCRIPTION = "Process video and audio files using ffmpeg. Supports probing metadata, converting formats, extracting audio, trimming clips, and extracting thumbnails."
+DESCRIPTION = "Process video and audio files using ffmpeg. Operations: probe, convert, extract_audio, trim, thumbnail, extract_frames, concat, compress, gif."
 PARAMETERS = {
     "input_path": {
         "type": "string",
         "required": True,
-        "description": "Path to the input video/audio file. If relative path, resolves to workspace."
+        "description": "Path to input video/audio file. Relative paths resolve to workspace. Not required for concat (use input_paths instead).",
     },
     "operation": {
         "type": "string",
         "required": False,
         "default": "probe",
-        "description": "Operation to perform: 'probe' (get metadata), 'convert' (transcode), 'extract_audio' (strip video), 'trim' (cut clip), or 'thumbnail' (extract frame)"
+        "description": (
+            "probe — stream/format metadata as JSON | "
+            "convert — transcode to another format | "
+            "extract_audio — strip video, keep audio | "
+            "trim — cut clip by start_time/duration | "
+            "thumbnail — extract single frame | "
+            "extract_frames — bulk frame extraction at interval (for vision analysis) | "
+            "concat — join multiple clips into one file | "
+            "compress — reduce filesize with H.264/AAC | "
+            "gif — create animated GIF from a clip"
+        ),
     },
     "output_path": {
         "type": "string",
         "required": False,
-        "description": "Output path for the operation. If relative path, resolves to workspace. Auto-generated for extract_audio and thumbnail if not provided."
+        "description": "Output file path. Relative paths resolve to workspace. Auto-generated for extract_audio, thumbnail, compress, and gif if omitted.",
+    },
+    "output_dir": {
+        "type": "string",
+        "required": False,
+        "description": "Output directory for extract_frames. Auto-generated next to input file if omitted.",
+    },
+    "input_paths": {
+        "type": "array",
+        "required": False,
+        "description": "List of file paths for concat operation.",
     },
     "video_codec": {
         "type": "string",
         "required": False,
-        "description": "Video codec for convert operation (e.g., 'libx264', 'libx265', 'copy'). If not specified, defaults to 'copy'."
+        "description": "Video codec for convert (e.g. 'libx264', 'libx265', 'copy'). Default: copy.",
     },
     "audio_codec": {
         "type": "string",
         "required": False,
-        "description": "Audio codec for convert operation (e.g., 'aac', 'libmp3lame', 'copy'). If not specified, defaults to 'copy'."
+        "description": "Audio codec for convert (e.g. 'aac', 'libmp3lame', 'copy'). Default: copy.",
     },
     "audio_format": {
         "type": "string",
         "required": False,
         "default": "mp3",
-        "description": "Audio format for extract_audio operation: mp3, wav, flac, m4a."
+        "description": "Audio format for extract_audio: mp3, wav, flac, m4a.",
     },
     "start_time": {
         "type": "string",
         "required": False,
-        "description": "Start time for trim operation (format: HH:MM:SS or seconds)."
+        "description": "Start time for trim or gif (HH:MM:SS or seconds).",
     },
     "duration": {
         "type": "string",
         "required": False,
-        "description": "Duration for trim operation (format: HH:MM:SS or seconds). If not specified, trims to end of file."
+        "description": "Duration for trim or gif (HH:MM:SS or seconds).",
     },
     "timestamp": {
         "type": "string",
         "required": False,
         "default": "00:00:01",
-        "description": "Timestamp for thumbnail extraction (format: HH:MM:SS)."
+        "description": "Timestamp for thumbnail extraction (HH:MM:SS).",
+    },
+    "interval": {
+        "type": "integer",
+        "required": False,
+        "default": 30,
+        "description": "Seconds between frames for extract_frames. Default: 30.",
+    },
+    "scale_width": {
+        "type": "integer",
+        "required": False,
+        "description": "Resize width in pixels for extract_frames and compress. Height auto-scales. Default for frames: 1280.",
+    },
+    "frame_format": {
+        "type": "string",
+        "required": False,
+        "default": "jpg",
+        "description": "Image format for extract_frames: jpg or png.",
+    },
+    "video_crf": {
+        "type": "integer",
+        "required": False,
+        "default": 28,
+        "description": "H.264 quality for compress (18=high, 28=medium, 35=low). Default: 28.",
+    },
+    "audio_bitrate": {
+        "type": "string",
+        "required": False,
+        "default": "128k",
+        "description": "Audio bitrate for compress (e.g. '128k', '64k'). Default: 128k.",
+    },
+    "gif_fps": {
+        "type": "integer",
+        "required": False,
+        "default": 10,
+        "description": "Frames per second for gif output. Default: 10.",
+    },
+    "gif_width": {
+        "type": "integer",
+        "required": False,
+        "default": 480,
+        "description": "Width in pixels for gif output. Default: 480.",
     },
     "extra_args": {
         "type": "array",
         "required": False,
-        "description": "Additional ffmpeg arguments as a list of strings for convert operation."
+        "description": "Additional ffmpeg arguments as a list of strings for convert operation.",
     },
     "timeout": {
         "type": "integer",
         "required": False,
         "default": 600,
-        "description": "Timeout in seconds for the operation. Default 600 (10 minutes)."
-    }
+        "description": "Timeout in seconds. Default: 600 (10 minutes).",
+    },
 }
