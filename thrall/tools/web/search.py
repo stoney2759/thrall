@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import os
 import time
 from uuid import UUID
@@ -63,7 +63,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "web.search"
+NAME = "web_search"
 DESCRIPTION = "Search the web. Requires BRAVE_API_KEY or SERPER_API_KEY."
 PARAMETERS = {
     "query": {"type": "string", "required": True},

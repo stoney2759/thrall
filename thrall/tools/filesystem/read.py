@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
 from hooks import input_gate
@@ -42,7 +42,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     )
 
 
-NAME = "filesystem.read"
+NAME = "filesystem_read"
 DESCRIPTION = "Read a file from the filesystem. Returns numbered lines."
 PARAMETERS = {
     "path": {"type": "string", "required": True},

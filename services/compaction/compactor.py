@@ -162,6 +162,11 @@ def discard_pending(session_id: UUID) -> None:
     _pending.pop(session_id, None)
 
 
+def has_pending(session_id: UUID) -> bool:
+    """Return True if a manual compact is awaiting approval for this session."""
+    return session_id in _pending
+
+
 async def commit(session_id: UUID) -> int:
     """
     Apply pending compact: clear session, reseed with summary, persist to episodic store.

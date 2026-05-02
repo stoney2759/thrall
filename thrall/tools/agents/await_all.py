@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import asyncio
 import time
 from uuid import UUID
@@ -55,7 +55,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "agents.await_all"
+NAME = "agents_await_all"
 DESCRIPTION = "Wait for multiple agents to complete and return all their results. Polls until done or timeout."
 PARAMETERS = {
     "task_ids": {"type": "array", "required": True},

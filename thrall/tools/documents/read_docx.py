@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -63,7 +63,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "documents.read_docx"
+NAME = "documents_read_docx"
 DESCRIPTION = "Extract text from a Word document (.docx). Returns paragraphs with heading structure and optional table content."
 PARAMETERS = {
     "path":           {"type": "string",  "required": True},

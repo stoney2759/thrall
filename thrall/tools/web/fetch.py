@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from uuid import UUID
 import httpx
@@ -27,7 +27,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "web.fetch"
+NAME = "web_fetch"
 DESCRIPTION = "Fetch raw content from a URL."
 PARAMETERS = {
     "url": {"type": "string", "required": True},

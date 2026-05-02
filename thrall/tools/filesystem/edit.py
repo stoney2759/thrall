@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
 from thrall.tools.filesystem._resolve import resolve, is_protected
@@ -49,7 +49,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     )
 
 
-NAME = "filesystem.edit"
+NAME = "filesystem_edit"
 DESCRIPTION = "Replace a string in a file. Exact match required."
 PARAMETERS = {
     "path": {"type": "string", "required": True},

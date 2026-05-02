@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from pathlib import Path
 from uuid import UUID
@@ -64,7 +64,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "profile.switch"
+NAME = "profile_switch"
 DESCRIPTION = "Switch the active personality profile or list available profiles. Use this when the user asks to change Thrall's personality or tone."
 PARAMETERS = {
     "name": {"type": "string", "required": False, "default": "", "description": "Profile name to switch to. Omit to list available profiles."},

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -50,7 +50,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "agents.prepare"
+NAME = "agents_prepare"
 DESCRIPTION = "Assign tools to a catalog agent that has none. Reads the agent's soul, infers appropriate tools, and saves the updated definition. Use this when the user drops a new agent into the catalog."
 PARAMETERS = {
     "name": {"type": "string", "required": True},

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Optional
 from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
@@ -40,3 +41,5 @@ class SessionMemory(BaseModel):
     context: list[dict] = Field(default_factory=list)
     token_count: int = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    execution_mode: bool = False
+    execution_mode_started_at: Optional[datetime] = None

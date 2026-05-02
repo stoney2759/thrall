@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -27,7 +27,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "clipboard.save"
+NAME = "clipboard_save"
 DESCRIPTION = "Save a named snippet for later recall. Use this to store frequently used text, templates, or variables that the user wants to reuse."
 PARAMETERS = {
     "name":    {"type": "string", "required": True},

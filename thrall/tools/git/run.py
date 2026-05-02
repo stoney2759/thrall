@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import asyncio
 import os
 import subprocess
@@ -63,7 +63,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "git.run"
+NAME = "git_run"
 DESCRIPTION = (
     "Run any git command on a local repository. Pass the subcommand and flags directly "
     "(e.g. command='status', command='add -A', command='commit -m \"fix bug\"', "

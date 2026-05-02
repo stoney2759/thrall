@@ -33,8 +33,10 @@ def load_identity() -> str | None:
     from bootstrap import state
     soul = _read_file("SOUL.md")
     identity = _read_file("IDENTITY.md")
+    agents = _read_file("AGENTS.md")
+    tools = _read_file("TOOLS.md")
     personality = state.get_active_profile_content()
-    parts = [p for p in [soul, identity, personality] if p]
+    parts = [p for p in [soul, identity, agents, tools, personality] if p]
     return "\n\n".join(parts) if parts else None
 
 

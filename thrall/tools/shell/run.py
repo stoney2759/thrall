@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import asyncio
 import os
 import subprocess
@@ -61,7 +61,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "shell.run"
+NAME = "shell_run"
 DESCRIPTION = "Run a shell command and return stdout/stderr. cwd defaults to the workspace directory. For GUI smoke tests use a short timeout (5-10s). Default timeout is 300s."
 PARAMETERS = {
     "command": {"type": "string", "required": True},

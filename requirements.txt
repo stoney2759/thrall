@@ -30,3 +30,4 @@ pyperclip
 psutil
 pdfplumber
 python-docx
+yt-dlp

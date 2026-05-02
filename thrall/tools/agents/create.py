@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -67,7 +67,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "agents.create"
+NAME = "agents_create"
 DESCRIPTION = "Create a new named agent from a description. First call shows a draft for review. Call again with confirm=true to save."
 PARAMETERS = {
     "description": {"type": "string", "required": True},

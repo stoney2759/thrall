@@ -23,6 +23,8 @@ logs/
 # Dev artifacts
 THRALL2_STATE.md
 thrall-map.xml
+start-thrall.ps1
+restartclaude.ps1
 
 # Frontend
 dashboard/node_modules/

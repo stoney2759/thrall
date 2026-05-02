@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import re
 import time
 import uuid
@@ -57,7 +57,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "scheduler.add"
+NAME = "scheduler_add"
 DESCRIPTION = "Add a scheduled job. Use type='heartbeat' for recurring (schedule='30m'/'2h'/'1d') or type='cron' for daily at a time (schedule='18:00'). Optionally specify an agent from the catalog."
 PARAMETERS = {
     "schedule": {"type": "string", "required": True},
