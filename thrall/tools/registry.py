@@ -25,6 +25,7 @@ from thrall.tools.profile import switch as profile_switch
 from thrall.tools.video import download as video_download
 from thrall.tools.video import ffmpeg as video_ffmpeg
 from thrall.tools.transcription import run as transcription_run
+from thrall.tools.vision import analyze as vision_analyze
 from thrall.tools.audit_hook import before_call, after_call
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -79,6 +80,7 @@ _TOOLS: dict = {
     video_download.NAME: video_download.execute,
     video_ffmpeg.NAME: video_ffmpeg.execute,
     transcription_run.NAME: transcription_run.execute,
+    vision_analyze.NAME: vision_analyze.execute,
 }
 
 _SCHEMAS: dict = {
@@ -131,6 +133,7 @@ _SCHEMAS: dict = {
     video_download.NAME: (video_download.DESCRIPTION, video_download.PARAMETERS),
     video_ffmpeg.NAME: (video_ffmpeg.DESCRIPTION, video_ffmpeg.PARAMETERS),
     transcription_run.NAME: (transcription_run.DESCRIPTION, transcription_run.PARAMETERS),
+    vision_analyze.NAME: (vision_analyze.DESCRIPTION, vision_analyze.PARAMETERS),
 }
 
 

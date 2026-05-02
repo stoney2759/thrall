@@ -361,6 +361,31 @@ async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await _send(update, response)
 
 
+async def cmd_watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_allowed(update):
+        return
+    await update.message.chat.send_action(ChatAction.TYPING)
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    url = " ".join(context.args) if context.args else ""
+    ctx = CommandContext(
+        user_id=str(user.id),
+        session_id=_session_id(user.id),
+        transport=Transport.TELEGRAM,
+        args=url,
+    )
+    response = await dispatch("watch", ctx)
+    if not response:
+        await update.message.reply_text("Usage: /watch <video_url>")
+        return
+    use_audio = user.id in _voice_mode
+    if use_audio:
+        await _send_audio(update, response)
+    else:
+        await _send(update, response)
+
+
 # ── Commands for voice mode ───────────────────────────────────────────────────
 
 async def cmd_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -610,6 +635,7 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("voice", cmd_voice))
     app.add_handler(CommandHandler("stop", cmd_stop))
     app.add_handler(CommandHandler("approve", cmd_approve))
+    app.add_handler(CommandHandler("watch", cmd_watch))
 
     # Voice and audio messages
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
@@ -696,6 +722,7 @@ async def set_commands(app: Application) -> None:
         BotCommand("voice", "Toggle voice mode on/off"),
         BotCommand("stop", "Cancel the currently running task"),
         BotCommand("approve", "Approve a pending proposal and execute"),
+        BotCommand("watch", "Process a video: download, transcribe, extract frames, store in memory"),
     ])
     from scheduler import runner
     runner.start(app.bot)

@@ -19,6 +19,7 @@ from commands.cron import CronCommand
 from commands.heartbeat import HeartbeatCommand
 from commands.stop import StopCommand
 from commands.approve import ApproveCommand
+from commands.watch import WatchCommand
 
 _COMMANDS: dict[str, Command] = {
     cmd.name(): cmd
@@ -42,6 +43,7 @@ _COMMANDS: dict[str, Command] = {
         HeartbeatCommand(),
         StopCommand(),
         ApproveCommand(),
+        WatchCommand(),
     ]
 }
 
