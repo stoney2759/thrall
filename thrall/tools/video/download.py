@@ -2,9 +2,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import pathlib
 import subprocess
-import sys
 import time
 from uuid import UUID
 from bootstrap import state
@@ -64,11 +62,11 @@ async def execute(call: ToolCall) -> ToolResult:
     else:
         return _result(call.id, error=f"unknown operation: {operation}", start=start)
     
-    # Prepare environment
+    # Prepare environment — use system PATH as-is so the yt-dlp binary
+    # resolves from wherever it is actually installed, not from sys.executable's
+    # Scripts directory (which may be the wrong venv).
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
-    scripts_dir = str(pathlib.Path(sys.executable).parent)
-    env["PATH"] = scripts_dir + os.pathsep + env.get("PATH", "")
     
     # Set download directory to workspace if not absolute
     if operation == "download" and not os.path.isabs(output_path):
