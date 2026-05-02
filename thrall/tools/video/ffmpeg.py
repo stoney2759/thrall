@@ -2,9 +2,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import pathlib
 import subprocess
-import sys
 import time
 from uuid import UUID
 from bootstrap import state
@@ -15,11 +13,8 @@ _MAX_OUTPUT = 16_000
 
 
 def _run_ffmpeg(args: list[str], cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
-    """Execute ffmpeg with given arguments."""
-    cmd = [sys.executable, "-m", "ffmpeg"] + args
-    
     result = subprocess.run(
-        cmd,
+        ["ffmpeg", "-y"] + args,
         capture_output=True,
         text=True,
         cwd=cwd,
@@ -30,11 +25,8 @@ def _run_ffmpeg(args: list[str], cwd: str | None, timeout: int, env: dict) -> tu
 
 
 def _run_ffprobe(args: list[str], cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
-    """Execute ffprobe with given arguments."""
-    cmd = [sys.executable, "-m", "ffprobe"] + args
-    
     result = subprocess.run(
-        cmd,
+        ["ffprobe"] + args,
         capture_output=True,
         text=True,
         cwd=cwd,
@@ -71,11 +63,7 @@ async def execute(call: ToolCall) -> ToolResult:
         if output_path and not os.path.isabs(output_path):
             output_path = os.path.join(workspace_dir, output_path)
     
-    # Prepare environment
     env = os.environ.copy()
-    env["PYTHONUNBUFFERED"] = "1"
-    scripts_dir = str(pathlib.Path(sys.executable).parent)
-    env["PATH"] = scripts_dir + os.pathsep + env.get("PATH", "")
     
     try:
         if operation == "probe":

@@ -174,4 +174,5 @@ Delegate to one of these specialised agents when the user's request matches thei
 - **summariser** — condense long content into structured summary
 - **todo-worker** — work through TODO/FIXME comments in the codebase
 - **typescript-coder** — TypeScript and React implementation work
+- **video-processor** — full video pipeline: URL/local file → audio extraction → transcription → saved transcript
 - **youtube-transcriber** — transcribe a YouTube video from URL to file

@@ -24,6 +24,7 @@ from thrall.tools.audio import generate as audio_generate
 from thrall.tools.profile import switch as profile_switch
 from thrall.tools.video import download as video_download
 from thrall.tools.video import ffmpeg as video_ffmpeg
+from thrall.tools.transcription import run as transcription_run
 from thrall.tools.audit_hook import before_call, after_call
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ _TOOLS: dict = {
     profile_switch.NAME: profile_switch.execute,
     video_download.NAME: video_download.execute,
     video_ffmpeg.NAME: video_ffmpeg.execute,
+    transcription_run.NAME: transcription_run.execute,
 }
 
 _SCHEMAS: dict = {
@@ -128,6 +130,7 @@ _SCHEMAS: dict = {
     profile_switch.NAME: (profile_switch.DESCRIPTION, profile_switch.PARAMETERS),
     video_download.NAME: (video_download.DESCRIPTION, video_download.PARAMETERS),
     video_ffmpeg.NAME: (video_ffmpeg.DESCRIPTION, video_ffmpeg.PARAMETERS),
+    transcription_run.NAME: (transcription_run.DESCRIPTION, transcription_run.PARAMETERS),
 }
 
 
