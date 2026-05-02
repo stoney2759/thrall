@@ -15,8 +15,7 @@ _MAX_OUTPUT = 16_000
 
 
 def _run_ytdlp(args: list[str], cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
-    """Execute yt-dlp with given arguments."""
-    cmd = [sys.executable, "-m", "yt_dlp"] + args
+    cmd = ["yt-dlp"] + args
     
     result = subprocess.run(
         cmd,
