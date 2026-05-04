@@ -2,19 +2,50 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 import subprocess
 import time
 from uuid import UUID
 from bootstrap import state
 from schemas.tool import ToolCall, ToolResult
+from constants.tools import MAX_OUTPUT
 
 _DEFAULT_TIMEOUT = 600  # 10 minutes default for ffmpeg operations
-_MAX_OUTPUT = 16_000
+
+_FFMPEG_SEARCH_PATHS = [
+    r"C:\ffmpeg\bin\ffmpeg.exe",
+    r"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+    r"C:\ProgramData\chocolatey\bin\ffmpeg.exe",
+]
+_FFPROBE_SEARCH_PATHS = [
+    r"C:\ffmpeg\bin\ffprobe.exe",
+    r"C:\Program Files\ffmpeg\bin\ffprobe.exe",
+    r"C:\ProgramData\chocolatey\bin\ffprobe.exe",
+]
+
+
+def _find_binary(name: str, fallbacks: list[str]) -> str:
+    found = shutil.which(name)
+    if found:
+        return found
+    # winget installs may not update PATH until login — search known locations
+    for path in fallbacks:
+        if os.path.isfile(path):
+            return path
+    # Last resort: search winget packages dir
+    winget_base = os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Packages")
+    if os.path.isdir(winget_base):
+        for root, dirs, files in os.walk(winget_base):
+            exe = name if name.endswith(".exe") else name + ".exe"
+            if exe in files:
+                return os.path.join(root, exe)
+    return name  # fall back to bare name and let subprocess fail with a clear error
 
 
 def _run_ffmpeg(args: list[str], cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
+    binary = _find_binary("ffmpeg", _FFMPEG_SEARCH_PATHS)
     result = subprocess.run(
-        ["ffmpeg", "-y"] + args,
+        [binary, "-y"] + args,
         capture_output=True,
         text=True,
         cwd=cwd,
@@ -25,8 +56,9 @@ def _run_ffmpeg(args: list[str], cwd: str | None, timeout: int, env: dict) -> tu
 
 
 def _run_ffprobe(args: list[str], cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
+    binary = _find_binary("ffprobe", _FFPROBE_SEARCH_PATHS)
     result = subprocess.run(
-        ["ffprobe"] + args,
+        [binary] + args,
         capture_output=True,
         text=True,
         cwd=cwd,
@@ -83,7 +115,7 @@ async def execute(call: ToolCall) -> ToolResult:
             except:
                 result_output = out
             
-            return _result(call.id, output=result_output[:_MAX_OUTPUT], start=start)
+            return _result(call.id, output=result_output[:MAX_OUTPUT], start=start)
         
         elif operation == "convert":
             if not output_path:
@@ -341,6 +373,7 @@ PARAMETERS = {
     },
     "input_paths": {
         "type": "array",
+        "items": {"type": "string"},
         "required": False,
         "description": "List of file paths for concat operation.",
     },
@@ -419,6 +452,7 @@ PARAMETERS = {
     },
     "extra_args": {
         "type": "array",
+        "items": {"type": "string"},
         "required": False,
         "description": "Additional ffmpeg arguments as a list of strings for convert operation.",
     },

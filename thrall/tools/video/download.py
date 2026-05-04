@@ -7,9 +7,9 @@ import time
 from uuid import UUID
 from bootstrap import state
 from schemas.tool import ToolCall, ToolResult
+from constants.tools import MAX_OUTPUT
 
 _DEFAULT_TIMEOUT = 600  # 10 minutes default for video operations
-_MAX_OUTPUT = 16_000
 
 
 def _run_ytdlp(args: list[str], cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
@@ -67,15 +67,15 @@ async def execute(call: ToolCall) -> ToolResult:
     # Scripts directory (which may be the wrong venv).
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
-    
-    # Set download directory to workspace if not absolute
+
+    cwd = None
     if operation == "download" and not os.path.isabs(output_path):
         workspace_dir = state.get_workspace_dir()
         if workspace_dir:
-            env["PWD"] = workspace_dir
-    
+            cwd = workspace_dir
+
     try:
-        returncode, out, err = await asyncio.to_thread(_run_ytdlp, args, None, timeout, env)
+        returncode, out, err = await asyncio.to_thread(_run_ytdlp, args, cwd, timeout, env)
     except subprocess.TimeoutExpired:
         return _result(call.id, error=f"operation timed out after {timeout}s", start=start)
     except Exception as e:
@@ -100,7 +100,7 @@ async def execute(call: ToolCall) -> ToolResult:
             error_msg += f"\n{err[:2000]}"  # Limit error output
         return _result(call.id, error=error_msg, start=start)
     
-    return _result(call.id, output=result_output[:_MAX_OUTPUT], start=start)
+    return _result(call.id, output=result_output[:MAX_OUTPUT], start=start)
 
 
 def _result(call_id: UUID, start: float, output: str | None = None, error: str | None = None) -> ToolResult:

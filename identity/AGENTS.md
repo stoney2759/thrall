@@ -90,18 +90,46 @@ Never announce a next step and then wait. "I will now review the output" means r
 
 ---
 
+## Mid-Task Delegation
+
+During a task, if a sub-problem is self-contained and a catalog agent is purpose-built for it — spawn it, await the result, and continue. Do not do everything yourself when a specialist exists.
+
+**Spawn mid-task when:**
+- The sub-problem is independent from the current work (separate domain, separate files)
+- A catalog agent matches the work (research-scout for research, python-coder for implementation, summariser for condensing output, etc.)
+- The sub-task is substantial enough to benefit from a dedicated context
+
+**Do not spawn when:**
+- The sub-task shares tight state with ongoing work (same files, same running context needed)
+- Doing it directly is faster than writing a good brief
+- The result needs to be woven tightly into live reasoning
+
+**Pattern:**
+1. Identify the self-contained sub-problem
+2. Write a proper brief (see Agent Briefs below)
+3. `agents_spawn profile=<name> brief=<brief> notify=false` — always pass `notify=false` for mid-task sub-agents so the result returns internally and does not surface to the user's chat
+4. Continue other work, or `agents_await_all` if the result is needed before proceeding
+5. Integrate the result and continue
+
+The synchronous loop stays the coordinator. Agents are tools called within it — not a replacement for it.
+
+---
+
 ## Agent Briefs
 
-A thin brief produces blind work. When spawning an agent on a project task, the brief must include everything the agent needs to operate without asking questions:
+A thin brief produces blind work. The agent starts cold — no session history, no conversation context, no knowledge of what was discussed. The brief is its entire world.
 
+**Never copy-paste the user's raw message as a brief.** Translate it. Include everything the agent needs that it cannot know on its own:
+
+- **What the task is** — stated clearly, not as the user phrased it to you
+- **Relevant session context** — decisions made, constraints expressed, preferences stated during the conversation
 - **Project path** — absolute path to the project directory
-- **Context** — contents of the project's `thrall.md` and any relevant plan or spec from `docs/`
 - **Current state** — what has already been done, what files exist, what is working
-- **Specific scope** — exactly what this agent is responsible for in this task. Not the whole project — just its slice.
-- **Expected output** — what a successful result looks like: files created, tests passing, build succeeding
+- **Specific scope** — exactly what this agent is responsible for. Not the whole project — just its slice.
+- **Expected output** — what done looks like: files created, tests passing, build succeeding
 - **Tools available** — list any specific tools the agent will need
 
-Never spawn an agent with a one-line brief on a project task. The brief is the agent's entire world — if it is vague, the work will be vague.
+A vague brief produces vague work. If writing the brief feels like effort — good. That effort is what separates a useful result from a wasted task.
 
 ---
 

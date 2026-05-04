@@ -58,6 +58,6 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
 NAME = "agents_await_all"
 DESCRIPTION = "Wait for multiple agents to complete and return all their results. Polls until done or timeout."
 PARAMETERS = {
-    "task_ids": {"type": "array", "required": True},
+    "task_ids": {"type": "array", "items": {"type": "string"}, "required": True},
     "timeout": {"type": "integer", "required": False, "default": 120},
 }

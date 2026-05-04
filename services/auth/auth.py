@@ -6,7 +6,7 @@ from schemas.message import Transport
 def is_authorised(user_id: str, transport: Transport) -> bool:
     config = state.get_config()
 
-    if transport in (Transport.CLI, Transport.SCHEDULER):
+    if transport in (Transport.CLI, Transport.SCHEDULER, Transport.API):
         return True
 
     transport_config = config.get("transports", {}).get(transport.value, {})

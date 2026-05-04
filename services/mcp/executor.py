@@ -16,7 +16,7 @@ def set_manager(manager: "MCPClientManager") -> None:
 async def execute(tool_name: str, args: dict[str, Any]) -> str:
     """
     Route an MCP tool call to the correct server client.
-    tool_name format: 'server_name.tool_name' e.g. 'gmail.send_email'
+    tool_name format: 'server_name__tool_name' e.g. 'gmail__send_email'
     """
     if _manager is None:
         return "Error: MCP manager not initialised"

@@ -8,9 +8,9 @@ from pathlib import Path
 from uuid import UUID
 from bootstrap import state
 from schemas.tool import ToolCall, ToolResult
+from constants.tools import MAX_OUTPUT
 
 _DEFAULT_TIMEOUT = 60
-_MAX_OUTPUT = 16_000
 
 # Subcommands that modify history or remote state — require explicit confirmation arg
 _DESTRUCTIVE = {"push --force", "push -f", "reset --hard", "clean -f", "rebase"}
@@ -51,7 +51,7 @@ async def execute(call: ToolCall) -> ToolResult:
     combined = out
     if err:
         combined += f"\n[stderr]\n{err}"
-    combined = combined[:_MAX_OUTPUT]
+    combined = combined[:MAX_OUTPUT]
 
     if returncode != 0:
         return _result(call.id, error=f"exit {returncode}\n{combined}", start=start)

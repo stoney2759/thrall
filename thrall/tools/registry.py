@@ -26,6 +26,9 @@ from thrall.tools.video import download as video_download
 from thrall.tools.video import ffmpeg as video_ffmpeg
 from thrall.tools.transcription import run as transcription_run
 from thrall.tools.vision import analyze as vision_analyze
+from thrall.tools.interaction import ask_user as interaction_ask_user, monitor as interaction_monitor
+from thrall.tools.notebook import read as notebook_read, edit as notebook_edit
+from thrall.tools.ide import diagnostics as ide_diagnostics
 from thrall.tools.audit_hook import before_call, after_call
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -81,6 +84,11 @@ _TOOLS: dict = {
     video_ffmpeg.NAME: video_ffmpeg.execute,
     transcription_run.NAME: transcription_run.execute,
     vision_analyze.NAME: vision_analyze.execute,
+    interaction_ask_user.NAME: interaction_ask_user.execute,
+    interaction_monitor.NAME: interaction_monitor.execute,
+    notebook_read.NAME: notebook_read.execute,
+    notebook_edit.NAME: notebook_edit.execute,
+    ide_diagnostics.NAME: ide_diagnostics.execute,
 }
 
 _SCHEMAS: dict = {
@@ -134,6 +142,11 @@ _SCHEMAS: dict = {
     video_ffmpeg.NAME: (video_ffmpeg.DESCRIPTION, video_ffmpeg.PARAMETERS),
     transcription_run.NAME: (transcription_run.DESCRIPTION, transcription_run.PARAMETERS),
     vision_analyze.NAME: (vision_analyze.DESCRIPTION, vision_analyze.PARAMETERS),
+    interaction_ask_user.NAME: (interaction_ask_user.DESCRIPTION, interaction_ask_user.PARAMETERS),
+    interaction_monitor.NAME: (interaction_monitor.DESCRIPTION, interaction_monitor.PARAMETERS),
+    notebook_read.NAME: (notebook_read.DESCRIPTION, notebook_read.PARAMETERS),
+    notebook_edit.NAME: (notebook_edit.DESCRIPTION, notebook_edit.PARAMETERS),
+    ide_diagnostics.NAME: (ide_diagnostics.DESCRIPTION, ide_diagnostics.PARAMETERS),
 }
 
 
@@ -153,8 +166,10 @@ def get_definitions(allowed: list[str] | None = None) -> list[dict]:
     native = list(_SCHEMAS.keys())
     names = allowed if allowed is not None else native
     result = [_to_openai_def(name) for name in names if name in _SCHEMAS]
-    # Append MCP tools (always included — no allow-list filtering for now)
-    result.extend(_MCP_TOOLS.values())
+    if allowed is None:
+        result.extend(_MCP_TOOLS.values())
+    else:
+        result.extend(v for k, v in _MCP_TOOLS.items() if k in allowed)
     return result
 
 

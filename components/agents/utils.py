@@ -27,7 +27,7 @@ def list_agents() -> list[AgentDefinition]:
     if not _CATALOG_DIR.exists():
         return []
     agents = []
-    for path in sorted(_CATALOG_DIR.glob("*.toml")):
+    for path in sorted(_CATALOG_DIR.rglob("*.toml")):
         try:
             agents.append(_from_toml(path.read_text(encoding="utf-8")))
         except Exception:
@@ -91,19 +91,36 @@ def _from_toml(text: str) -> AgentDefinition:
 
     model = _get("model")
     if model:
-        # Strip the -spark sub-variant suffix — it's not a real OpenRouter model variant.
-        # Keeps "-codex" intact since openai/gpt-5.x-codex models are real on OpenRouter.
-        import re as _re
-        model = _re.sub(r"-spark$", "", model)
-        # If no provider prefix, prepend openai/ — covers gpt-5.x-codex → openai/gpt-5.x-codex
-        if "/" not in model:
-            model = f"openai/{model}"
+        # Map OpenThrall tier names to configured models
+        _TIER_MAP = {
+            "standard": "capable",
+            "premium":  "premium",
+            "capable":  "capable",
+            "lightweight": "lightweight",
+        }
+        if model.lower() in _TIER_MAP:
+            from bootstrap import state
+            agents_cfg = state.get_config().get("agents", {})
+            tier_key = f"tier_{_TIER_MAP[model.lower()]}"
+            model = agents_cfg.get(tier_key, "google/gemini-2.5-flash")
+        else:
+            # Strip the -spark sub-variant suffix — not a real OpenRouter variant.
+            import re as _re
+            model = _re.sub(r"-spark$", "", model)
+            # If no provider prefix, prepend openai/
+            if "/" not in model:
+                model = f"openai/{model}"
+
+    allowed_tools = _get_list("allowed_tools")
+    if not allowed_tools:
+        from thrall.tools.registry import list_tools
+        allowed_tools = list_tools()
 
     return AgentDefinition(
         name=_get("name"),
         description=_get("description"),
         model=model,
         created_at=_get("created_at"),
-        allowed_tools=_get_list("allowed_tools"),
+        allowed_tools=allowed_tools,
         soul=soul,
     )

@@ -50,6 +50,17 @@ def delete_job(job_id: str) -> bool:
         return True
 
 
+def toggle_job(job_id: str) -> bool:
+    with _LOCK:
+        raw = _load_raw()
+        for d in raw:
+            if d["id"] == job_id:
+                d["enabled"] = not d.get("enabled", True)
+                _save_raw(raw)
+                return True
+        return False
+
+
 def update_last_run(job_id: str, ts: str) -> None:
     with _LOCK:
         raw = _load_raw()

@@ -81,3 +81,20 @@ Complete tool reference. Tools are called natively by the reasoning loop.
 - `scheduler_add` — add a scheduled or recurring job
 - `scheduler_list` — list all scheduled jobs
 - `scheduler_delete` — delete a scheduled job
+
+## Transcription
+- `transcription_run` — transcribe audio to text via Whisper (openrouter or groq)
+
+## Vision
+- `vision_analyze` — describe an image using the configured vision model
+
+## Interaction
+- `interaction_ask_user` — pause mid-task, send a question to the user, and wait for their reply before continuing
+- `interaction_monitor` — run a command and stream its output; stops early when a pattern is matched or timeout is reached
+
+## Notebook
+- `notebook_read` — read a Jupyter notebook (.ipynb); returns all cells with source and outputs
+- `notebook_edit` — replace, insert, or delete a cell in a notebook (clears stale outputs on edit)
+
+## IDE
+- `ide_diagnostics` — run a linter/type-checker (ruff → mypy → pylint auto-selected) and return diagnostics

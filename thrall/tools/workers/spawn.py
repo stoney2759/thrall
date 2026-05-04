@@ -52,5 +52,5 @@ PARAMETERS = {
     "brief": {"type": "string", "required": True},
     "type": {"type": "string", "required": False, "default": "local"},
     "profile": {"type": "string", "required": False, "default": "default"},
-    "allowed_tools": {"type": "array", "required": False, "default": []},
+    "allowed_tools": {"type": "array", "items": {"type": "string"}, "required": False, "default": []},
 }

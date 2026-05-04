@@ -41,3 +41,4 @@ class Task(BaseModel):
     result: str | None = None
     error: str | None = None
     soul_override: str | None = None  # catalog agent system prompt, overrides default
+    silent: bool = False  # if True, suppress Telegram delivery notification on completion

@@ -7,9 +7,9 @@ import time
 from pathlib import Path
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
+from constants.tools import MAX_OUTPUT
 
 _DEFAULT_TIMEOUT = 30
-_MAX_OUTPUT = 16_000
 
 
 def _run_sync(tmp_path: str, timeout: int) -> tuple[int, str, str]:
@@ -44,9 +44,9 @@ async def execute(call: ToolCall) -> ToolResult:
             Path(tmp_path).unlink(missing_ok=True)
 
         if returncode != 0:
-            return _result(call.id, error=err[:_MAX_OUTPUT] or "non-zero exit", start=start)
+            return _result(call.id, error=err[:MAX_OUTPUT] or "non-zero exit", start=start)
 
-        combined = (out + ("\n[stderr]\n" + err if err else ""))[:_MAX_OUTPUT]
+        combined = (out + ("\n[stderr]\n" + err if err else ""))[:MAX_OUTPUT]
         return _result(call.id, output=combined or "(no output)", start=start)
 
     except Exception as e:

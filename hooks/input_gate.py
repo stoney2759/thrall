@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from schemas.message import Message, Transport
 from services.auth import auth
 from hooks import audit
+from constants.security import RATE_WINDOW
 
 _rate_lock = threading.Lock()
 _rate_tracker: dict[str, tuple[float, int]] = {}  # user_id -> (window_start, count)
-_RATE_WINDOW = 60.0
 
 
 def _is_rate_limited(user_id: str) -> bool:
@@ -26,7 +26,7 @@ def _is_rate_limited(user_id: str) -> bool:
             _rate_tracker[user_id] = (now, 1)
             return False
         window_start, count = _rate_tracker[user_id]
-        if now - window_start >= _RATE_WINDOW:
+        if now - window_start >= RATE_WINDOW:
             _rate_tracker[user_id] = (now, 1)
             return False
         if count >= limit:

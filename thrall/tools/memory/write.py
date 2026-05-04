@@ -53,7 +53,7 @@ DESCRIPTION = "Write to episodic or semantic memory. Goes through memory gate."
 PARAMETERS = {
     "layer": {"type": "string", "required": False, "default": "episodic"},
     "content": {"type": "string", "required": True},
-    "tags": {"type": "array", "required": False, "default": []},
+    "tags": {"type": "array", "items": {"type": "string"}, "required": False, "default": []},
     "confidence": {"type": "number", "required": False, "default": 1.0},
     "source": {"type": "string", "required": False, "default": "thrall"},
 }

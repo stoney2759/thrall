@@ -7,9 +7,9 @@ import time
 from uuid import UUID
 from bootstrap import state
 from schemas.tool import ToolCall, ToolResult
+from constants.tools import MAX_OUTPUT
 
 _DEFAULT_TIMEOUT = 300
-_MAX_OUTPUT = 16_000
 
 
 def _run_sync(command: str, cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
@@ -49,7 +49,7 @@ async def execute(call: ToolCall) -> ToolResult:
     combined = out
     if err:
         combined += f"\n[stderr]\n{err}"
-    combined = combined[:_MAX_OUTPUT]
+    combined = combined[:MAX_OUTPUT]
 
     if returncode != 0:
         return _result(call.id, error=f"exit {returncode}\n{combined}", start=start)
