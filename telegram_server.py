@@ -12,4 +12,8 @@ from transports.telegram.bot import run
 
 if __name__ == "__main__":
     start()
-    run()
+    try:
+        asyncio.run(run())
+    except KeyboardInterrupt:
+        print("\nShutdown complete.")
+        sys.exit(0)

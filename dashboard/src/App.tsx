@@ -38,9 +38,10 @@ export default function App() {
     <div className="flex h-screen bg-base text-primary overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        {activePanel === 'chat' && (
+        {/* Chat stays mounted so messages are never lost on panel switch */}
+        <div className={activePanel === 'chat' ? 'flex flex-col flex-1 min-h-0' : 'hidden'}>
           <Chat onSend={sendMessage} typing={wsStatus === 'typing'} />
-        )}
+        </div>
         {activePanel === 'control' && <ControlPanel />}
         {activePanel === 'agents' && <AgentsPanel />}
         {activePanel === 'scheduler' && <SchedulerPanel />}

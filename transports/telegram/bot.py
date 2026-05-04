@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import os
 import uuid
 from datetime import datetime, timezone
@@ -783,17 +784,24 @@ async def set_commands(app: Application) -> None:
             pass
 
 
-async def _shutdown(app) -> None:
+async def run() -> None:
     from scheduler import runner
-    runner.stop()
 
-
-def run() -> None:
     app = build_application()
-    app.post_init = set_commands
-    app.post_shutdown = _shutdown
-    app.run_polling(
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True,
-        close_loop=False,
-    )
+
+    async with app:
+        await app.initialize()
+        await set_commands(app)
+        await app.start()
+        await app.updater.start_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+        )
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            runner.stop()
+            await app.updater.stop()
+            await app.stop()

@@ -256,6 +256,18 @@ async def api_agents():
     ])
 
 
+@app.delete("/api/agents/{task_id}")
+async def api_agents_kill(task_id: str):
+    from thrall.tasks.pool import cancel
+    from uuid import UUID
+    try:
+        uid = UUID(task_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid task_id")
+    cancelled = await cancel(uid)
+    return JSONResponse({"ok": True, "cancelled": cancelled})
+
+
 @app.get("/api/scheduler")
 async def api_scheduler():
     try:
@@ -325,6 +337,15 @@ async def api_toggle_job(job_id: str):
     jobs = store.load_jobs()
     job = next((j for j in jobs if j.id == job_id), None)
     return JSONResponse({"ok": True, "enabled": job.enabled if job else None})
+
+
+@app.get("/api/commands")
+async def api_commands():
+    from commands.registry import all_commands
+    return JSONResponse([
+        {"name": cmd.name(), "description": cmd.description()}
+        for cmd in sorted(all_commands(), key=lambda c: c.name())
+    ])
 
 
 @app.websocket("/ws")

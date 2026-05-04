@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 # start.ps1 — Thrall full-stack launcher
-# Opens all three services as tabs in a single Windows Terminal window.
-# Launch order is enforced via Start-Sleep inside each tab's command.
+# Builds the dashboard, then opens Telegram + API as tabs in Windows Terminal.
+# Dashboard is served statically by the API at http://localhost:8000
 
 $Root      = $PSScriptRoot
 $Dashboard = Join-Path $Root "dashboard"
@@ -66,27 +66,37 @@ if ($ndProcs) {
 Log "Waiting 2s for ports to clear..." DarkGray
 Start-Sleep -Seconds 2
 
-# ── Step 2: Open Windows Terminal with 3 tabs ─────────────────────────────────
-# Tabs open together. API waits 5s, Dashboard waits 10s — so Thrall is up first.
+# ── Step 2: Build dashboard ───────────────────────────────────────────────────
+
+Section "Building dashboard"
+
+Log "Running npm run build..." Cyan
+Push-Location $Dashboard
+npm run build 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+$buildExit = $LASTEXITCODE
+Pop-Location
+
+if ($buildExit -ne 0) {
+    Log "Dashboard build failed (exit $buildExit). Aborting." Red
+    exit 1
+}
+Log "Dashboard built — will be served at http://localhost:8000" Green
+
+# ── Step 3: Open Windows Terminal with 2 tabs ─────────────────────────────────
 
 Section "Launching Windows Terminal"
 
-Log "Opening 3 tabs: Telegram | API | Dashboard..." Cyan
+Log "Opening 2 tabs: Telegram | API..." Cyan
 
-# Wrap file paths in quotes to survive spaces in the project path.
-$fTelegram  = "`"$Root\start-telegram.ps1`""
-$fApi       = "`"$Root\start-api.ps1`""
-$fDashboard = "`"$Root\start-dashboard.ps1`""
+$fTelegram = "`"$Root\start-telegram.ps1`""
+$fApi      = "`"$Root\start-api.ps1`""
 
 Start-Process wt -ArgumentList @(
     "new-tab", "--title", "Telegram",
     "powershell", "-NoExit", "-ExecutionPolicy", "Bypass", "-File", $fTelegram,
     ";",
     "new-tab", "--title", "API",
-    "powershell", "-NoExit", "-ExecutionPolicy", "Bypass", "-File", $fApi,
-    ";",
-    "new-tab", "--title", "Dashboard",
-    "powershell", "-NoExit", "-ExecutionPolicy", "Bypass", "-File", $fDashboard
+    "powershell", "-NoExit", "-ExecutionPolicy", "Bypass", "-File", $fApi
 )
 
 Log "Windows Terminal opened." Green
@@ -95,8 +105,7 @@ Log "Windows Terminal opened." Green
 
 Section "All systems go"
 Log "Telegram server  →  running (Telegram tab)" Green
-Log "API server       →  http://localhost:8000   (API tab)" Green
-Log "Dashboard        →  http://localhost:5173   (Dashboard tab)" Green
+Log "API + Dashboard  →  http://localhost:8000   (API tab)" Green
 Write-Host ""
 Log "CPU affinity (optional — run after services are up):" DarkGray
 Log '  Get-Process python | ForEach-Object { $_.ProcessorAffinity = 15 }' DarkGray
