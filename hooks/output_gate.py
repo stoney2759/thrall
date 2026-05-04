@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 from hooks import audit
 from bootstrap import state
+from constants.security import MAX_RESPONSE_LENGTH
 
 # Patterns that suggest accidental secret exposure
 _SECRET_PATTERNS: list[re.Pattern] = [
@@ -21,9 +22,6 @@ _SECRET_PATTERNS: list[re.Pattern] = [
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),            # Private key headers
 ]
 
-_MAX_RESPONSE_LENGTH = 32_000
-
-
 @dataclass
 class OutputResult:
     allowed: bool
@@ -41,8 +39,8 @@ def run(content: str) -> OutputResult:
     if secrets_found:
         audit.log_deny("output_gate", reason="secrets scrubbed from response")
 
-    if len(cleaned) > _MAX_RESPONSE_LENGTH:
-        cleaned = cleaned[:_MAX_RESPONSE_LENGTH] + "\n\n[truncated]"
+    if len(cleaned) > MAX_RESPONSE_LENGTH:
+        cleaned = cleaned[:MAX_RESPONSE_LENGTH] + "\n\n[truncated]"
         audit.log_allow("output_gate", reason="response truncated to limit")
     else:
         audit.log_allow("output_gate", reason="response passed")

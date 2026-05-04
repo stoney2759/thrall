@@ -6,12 +6,11 @@ from pathlib import Path
 from schemas.memory import Episode, KnowledgeFact
 from bootstrap import state
 from hooks import audit
+from constants.memory import MAX_EPISODES, MAX_FACTS
 
 logger = logging.getLogger(__name__)
 
 _IDENTITY_DIR = Path(__file__).parent.parent / "identity"
-_MAX_EPISODES = 20
-_MAX_FACTS = 10
 
 
 def build_context(
@@ -49,7 +48,7 @@ def build_context(
 
     # Long-term knowledge injected as system context
     if facts:
-        capped = facts[:_MAX_FACTS]
+        capped = facts[:MAX_FACTS]
         fact_block = "\n".join(f"- {f.content}" for f in capped)
         messages.append({
             "role": "system",
@@ -58,7 +57,7 @@ def build_context(
 
     # Relevant episodic memory
     if episodes:
-        capped = episodes[:_MAX_EPISODES]
+        capped = episodes[:MAX_EPISODES]
         episode_block = "\n".join(
             f"[{e.timestamp.strftime('%Y-%m-%d %H:%M')}] {e.role}: {e.content}"
             for e in capped

@@ -10,6 +10,7 @@ import httpx
 from interfaces.llm import LLMProvider
 from schemas.llm import LLMResponse, LLMUsage, ToolCallRequest
 from bootstrap import state
+from constants.llm import MAX_RETRIES, RETRY_BASE_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,6 @@ _XML_TOOL_RE = re.compile(
     re.DOTALL,
 )
 _PARAM_RE = re.compile(r"<parameter=([^>]+)>(.*?)</parameter>", re.DOTALL)
-
-_MAX_RETRIES = 3       # fallback if config not loaded
-_RETRY_BASE = 5        # fallback if config not loaded
 
 
 # ── OpenRouter error taxonomy ──────────────────────────────────────────────────
@@ -68,7 +66,10 @@ _CODE_MAP: dict[int, type[OpenRouterError]] = {
 def _raise_openrouter_error(code: int | str, message: str, metadata: dict | None = None) -> None:
     cls = _CODE_MAP.get(int(code) if str(code).isdigit() else 0, OpenRouterError)
     err = cls(code, message, metadata)
-    logger.error("OpenRouter API error — %s", err)
+    if metadata:
+        logger.error("OpenRouter API error — %s | metadata: %s", err, metadata)
+    else:
+        logger.error("OpenRouter API error — %s", err)
     raise err
 
 
@@ -83,7 +84,7 @@ def _check_body(data: dict) -> None:
 
 async def _post_with_retry(
     client: httpx.AsyncClient, url: str, headers: dict, payload: dict, model: str = "",
-    max_retries: int = _MAX_RETRIES, retry_base: int = _RETRY_BASE,
+    max_retries: int = MAX_RETRIES, retry_base: int = RETRY_BASE_SECONDS,
 ) -> httpx.Response:
     for attempt in range(max_retries):
         response = await client.post(url, headers=headers, json=payload)
@@ -97,6 +98,7 @@ async def _post_with_retry(
         if response.status_code >= 400:
             try:
                 body = response.json()
+                logger.error("OpenRouter %s raw body: %s", response.status_code, json.dumps(body)[:1000])
                 err = body.get("error", {})
                 _raise_openrouter_error(
                     err.get("code", response.status_code),
@@ -230,8 +232,8 @@ class OpenRouterProvider(LLMProvider):
         llm_cfg = state.get_config().get("llm", {})
         self._request_timeout = float(llm_cfg.get("request_timeout", 120))
         self._tool_timeout = float(llm_cfg.get("tool_timeout", 300))
-        self._max_retries = int(llm_cfg.get("max_retries", _MAX_RETRIES))
-        self._retry_base = int(llm_cfg.get("retry_base_seconds", _RETRY_BASE))
+        self._max_retries = int(llm_cfg.get("max_retries", MAX_RETRIES))
+        self._retry_base = int(llm_cfg.get("retry_base_seconds", RETRY_BASE_SECONDS))
 
     def name(self) -> str:
         return "openrouter"

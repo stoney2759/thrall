@@ -20,8 +20,7 @@ from thrall.coordinator import receive
 from transports.telegram import auth
 from services import session_memory
 from bootstrap import state
-
-_TG_MAX_LENGTH = 4096
+from constants.telegram import TG_MAX_LENGTH
 
 
 # ── Session ID ────────────────────────────────────────────────────────────────
@@ -35,7 +34,7 @@ def _session_id(user_id: int) -> uuid.UUID:
 
 async def _send(update: Update, text: str) -> None:
     """Split and send long responses within Telegram's 4096 char limit."""
-    chunks = [text[i:i + _TG_MAX_LENGTH] for i in range(0, len(text), _TG_MAX_LENGTH)]
+    chunks = [text[i:i + TG_MAX_LENGTH] for i in range(0, len(text), TG_MAX_LENGTH)]
     for chunk in chunks:
         await update.message.reply_text(chunk)
 
@@ -375,15 +374,20 @@ async def cmd_watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         transport=Transport.TELEGRAM,
         args=url,
     )
-    response = await dispatch("watch", ctx)
-    if not response:
-        await update.message.reply_text("Usage: /watch <video_url>")
-        return
-    use_audio = user.id in _voice_mode
-    if use_audio:
-        await _send_audio(update, response)
-    else:
-        await _send(update, response)
+    try:
+        response = await dispatch("watch", ctx)
+        if not response:
+            await update.message.reply_text("Usage: /watch <video_url>")
+            return
+        use_audio = user.id in _voice_mode
+        if use_audio:
+            await _send_audio(update, response)
+        else:
+            await _send(update, response)
+    except Exception as e:
+        import traceback
+        state.log_error(f"cmd_watch error: {e}\n{traceback.format_exc()}")
+        await update.message.reply_text(f"Error: {e}")
 
 
 # ── Commands for voice mode ───────────────────────────────────────────────────
@@ -410,11 +414,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("Unauthorised. Your user ID is not on the allowlist.")
         return
 
+    uid = update.effective_user.id
+    session_id = _session_id(uid)
+    user_text = update.message.text or ""
+
+    # Register a sender so interaction_ask_user can push questions to this user
+    from services import ask_user_channel
+    chat_id = update.effective_chat.id
+
+    async def _send_to_user(text: str) -> None:
+        await context.bot.send_message(chat_id=chat_id, text=text)
+
+    ask_user_channel.register_sender(session_id, _send_to_user)
+
+    # If a tool is waiting for user input, deliver the reply directly and stop
+    if ask_user_channel.has_pending(session_id):
+        ask_user_channel.deliver_reply(session_id, user_text)
+        return
+
     await update.message.chat.send_action(ChatAction.TYPING)
 
     message = _build_message(update)
-    user_text = update.message.text or ""
-    uid = update.effective_user.id
 
     try:
         response = await receive(message)
@@ -437,6 +457,15 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not _is_allowed(update):
         await update.message.reply_text("Unauthorised.")
         return
+
+    from services import ask_user_channel
+    _session = _session_id(update.effective_user.id)
+    _chat_id = update.effective_chat.id
+
+    async def _send_to_user(text: str) -> None:
+        await context.bot.send_message(chat_id=_chat_id, text=text)
+
+    ask_user_channel.register_sender(_session, _send_to_user)
 
     await update.message.chat.send_action(ChatAction.TYPING)
 
@@ -492,6 +521,15 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not _is_allowed(update):
         await update.message.reply_text("Unauthorised.")
         return
+
+    from services import ask_user_channel
+    _session = _session_id(update.effective_user.id)
+    _chat_id = update.effective_chat.id
+
+    async def _send_to_user(text: str) -> None:
+        await context.bot.send_message(chat_id=_chat_id, text=text)
+
+    ask_user_channel.register_sender(_session, _send_to_user)
 
     doc = update.message.document
     if not doc:
@@ -550,6 +588,15 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not _is_allowed(update):
         await update.message.reply_text("Unauthorised.")
         return
+
+    from services import ask_user_channel
+    _session = _session_id(update.effective_user.id)
+    _chat_id = update.effective_chat.id
+
+    async def _send_to_user(text: str) -> None:
+        await context.bot.send_message(chat_id=_chat_id, text=text)
+
+    ask_user_channel.register_sender(_session, _send_to_user)
 
     await update.message.chat.send_action(ChatAction.TYPING)
 
@@ -677,6 +724,8 @@ async def _register_task_delivery(app: Application) -> None:
 
     async def _deliver(task) -> None:
         from schemas.task import TaskStatus
+        if getattr(task, "silent", False):
+            return
         if task.status == TaskStatus.DONE:
             result = task.result or "(agent completed but returned no output)"
             text = f"Agent task complete:\n\n{result}"

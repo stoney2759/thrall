@@ -17,6 +17,7 @@ async def execute(call: ToolCall) -> ToolResult:
     brief = call.args.get("brief", "")
     profile_name = call.args.get("profile", "default")
     allowed_tools = call.args.get("allowed_tools", [])
+    notify = call.args.get("notify", True)
 
     if not brief:
         return _result(call.id, error="brief is required", start=start)
@@ -62,6 +63,7 @@ async def execute(call: ToolCall) -> ToolResult:
         brief=brief,
         profile=profile,
         soul_override=soul_override,
+        silent=not notify,
     )
 
     from thrall.tasks.pool import submit
@@ -80,5 +82,6 @@ DESCRIPTION = "Spawn an autonomous agent to work on a task in parallel. Use prof
 PARAMETERS = {
     "brief": {"type": "string", "required": True},
     "profile": {"type": "string", "required": False, "default": "default"},
-    "allowed_tools": {"type": "array", "required": False, "default": []},
+    "allowed_tools": {"type": "array", "items": {"type": "string"}, "required": False, "default": []},
+    "notify": {"type": "boolean", "required": False, "default": True, "description": "Set false when spawning a sub-agent mid-task — suppresses Telegram delivery notification so the result returns internally to Thrall only."},
 }

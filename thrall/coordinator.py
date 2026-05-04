@@ -15,11 +15,9 @@ from thrall import context
 from thrall.tools import registry as tools
 from hooks import input_gate, output_gate, tool_gate, audit, session_log
 from bootstrap import state
+from constants.coordinator import MAX_TOOL_ITERATIONS, AUTO_COMPACT_COOLDOWN_SECONDS
 
-logger = logging.getLogger(__name__)
-
-_MAX_TOOL_ITERATIONS = 30
-_AUTO_COMPACT_COOLDOWN_SECONDS = 300  # 5 minutes
+logger = logging.getLogger(__name__)  # 5 minutes
 
 _last_auto_compact: dict = {}
 
@@ -193,7 +191,7 @@ async def _reason(
         logger.info("Execution mode active for session %s — cap=%d ceiling=%d timeout=%ds",
                     message.session_id, max_iterations, token_ceiling, int(timeout_seconds))
     else:
-        max_iterations = _MAX_TOOL_ITERATIONS
+        max_iterations = MAX_TOOL_ITERATIONS
         token_ceiling = 0
         timeout_seconds = 0.0
         exec_start = None
@@ -346,7 +344,7 @@ async def _maybe_auto_compact(session_id) -> str | None:
     # Guard: debounce — don't auto-compact more than once per cooldown period
     now = datetime.now(timezone.utc).timestamp()
     last = _last_auto_compact.get(session_id, 0)
-    if now - last < _AUTO_COMPACT_COOLDOWN_SECONDS:
+    if now - last < AUTO_COMPACT_COOLDOWN_SECONDS:
         return None
 
     estimate = session_memory.estimate_tokens(session_id)

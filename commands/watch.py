@@ -35,7 +35,7 @@ class WatchCommand(Command):
             content=(
                 f"Process this video using the video-processor agent: {url}\n"
                 "Spawn the agent with profile=video-processor and wait for it to complete. "
-                "Return the full result including the summary, transcript word count, frames analysed, and saved file path."
+                "When it finishes, relay its output to the user exactly as-is — do not summarise, reformat, or add anything. The agent's report is the final response."
             ),
             transport=ctx.transport,
             user_id=ctx.user_id,
