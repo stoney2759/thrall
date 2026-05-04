@@ -20,14 +20,20 @@ def set_bot(bot) -> None:
 
 
 async def _push(text: str) -> None:
-    if _bot is None:
-        return
-    allowed: list = state.get_config().get("transports", {}).get("telegram", {}).get("allowed_user_ids", [])
-    for uid in allowed:
-        try:
-            await _bot.send_message(chat_id=uid, text=text)
-        except Exception:
-            pass
+    from transports.desktop.manager import broadcast
+    # Telegram
+    if _bot is not None:
+        allowed: list = state.get_config().get("transports", {}).get("telegram", {}).get("allowed_user_ids", [])
+        for uid in allowed:
+            try:
+                await _bot.send_message(chat_id=uid, text=text)
+            except Exception:
+                pass
+    # Dashboard WebSocket clients
+    try:
+        await broadcast(text)
+    except Exception:
+        pass
 
 
 def _parse_interval_seconds(schedule: str) -> int | None:

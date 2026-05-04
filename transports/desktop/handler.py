@@ -5,6 +5,7 @@ from uuid import uuid4
 from fastapi import WebSocket, WebSocketDisconnect
 from schemas.message import Message, Role, Transport
 from thrall import coordinator
+from transports.desktop import manager
 
 
 async def handle(ws: WebSocket) -> None:
@@ -32,6 +33,7 @@ async def handle(ws: WebSocket) -> None:
 
     session_id = uuid4()
     await _send(ws, {"type": "ready", "session_id": str(session_id)})
+    manager.register(ws)
 
     try:
         while True:
@@ -59,20 +61,45 @@ async def handle(ws: WebSocket) -> None:
 
             await _send(ws, {"type": "typing"})
 
-            message = Message(
-                session_id=session_id,
-                role=Role.USER,
-                content=content,
-                transport=Transport.API,
-                user_id="desktop",
-            )
+            if content.startswith("/"):
+                response = await _dispatch_command(content, str(session_id))
+            else:
+                message = Message(
+                    session_id=session_id,
+                    role=Role.USER,
+                    content=content,
+                    transport=Transport.API,
+                    user_id="desktop",
+                )
+                response = await coordinator.receive(message)
 
-            response = await coordinator.receive(message)
-            # reasoning field reserved for future desktop client — coordinator returns plain str for now
             await _send(ws, {"type": "response", "content": response, "reasoning": None})
 
     except WebSocketDisconnect:
         pass
+    finally:
+        manager.unregister(ws)
+
+
+async def _dispatch_command(content: str, session_id: str) -> str:
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+
+    parts = content.lstrip("/").split()
+    name = parts[0].lower() if parts else ""
+    args = parts[1:] if len(parts) > 1 else []
+
+    ctx = CommandContext(
+        user_id="desktop",
+        session_id=session_id,
+        transport=Transport.API,
+        args=args,
+    )
+
+    result = await dispatch(name, ctx)
+    if result is None:
+        return f"Unknown command: `/{name}`. Type `/help` for available commands."
+    return result
 
 
 async def _send(ws: WebSocket, data: dict) -> None:

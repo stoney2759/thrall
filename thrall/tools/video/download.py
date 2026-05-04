@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import subprocess
+import sys
 import time
 from uuid import UUID
 from bootstrap import state
@@ -13,7 +14,9 @@ _DEFAULT_TIMEOUT = 600  # 10 minutes default for video operations
 
 
 def _run_ytdlp(args: list[str], cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
-    cmd = ["yt-dlp"] + args
+    # Use the running Python to invoke yt_dlp as a module — the binary may not
+    # be on PATH, but the module is always available if the package is installed.
+    cmd = [sys.executable, "-m", "yt_dlp"] + args
     
     result = subprocess.run(
         cmd,

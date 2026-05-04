@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Send, RotateCcw, Plus, Paperclip, X } from 'lucide-react';
+import { Send, RotateCcw, Plus, Paperclip, X, Link2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useStore } from '../store';
 import type { Session } from '../store';
@@ -14,6 +14,38 @@ interface AttachedImage {
   dataUrl: string;
 }
 
+interface CommandEntry {
+  name: string;
+  description: string;
+}
+
+const IMG_BLOCK = /\[Image: ([^\]]+)\]\n(data:image\/[^\s]+)/g;
+
+function renderUserContent(content: string) {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  IMG_BLOCK.lastIndex = 0;
+  while ((match = IMG_BLOCK.exec(content)) !== null) {
+    if (match.index > last) {
+      parts.push(<span key={last}>{content.slice(last, match.index)}</span>);
+    }
+    parts.push(
+      <div key={match.index} className="mt-2">
+        <img
+          src={match[2]}
+          alt={match[1]}
+          className="max-w-[240px] max-h-[180px] rounded-lg border border-border object-cover"
+        />
+        <p className="text-xs text-muted mt-1">{match[1]}</p>
+      </div>,
+    );
+    last = match.index + match[0].length;
+  }
+  if (last < content.length) parts.push(<span key={last}>{content.slice(last)}</span>);
+  return parts.length > 0 ? parts : content;
+}
+
 const EXT_TO_LANG: Record<string, string> = {
   py: 'python', js: 'javascript', ts: 'typescript',
   jsx: 'javascript', tsx: 'typescript', json: 'json',
@@ -24,12 +56,13 @@ const EXT_TO_LANG: Record<string, string> = {
 interface SessionTabProps {
   session: Session;
   active: boolean;
+  isMain: boolean;
   onSwitch: (id: string) => void;
   onClose: (id: string) => void;
   onRename: (id: string, name: string) => void;
 }
 
-function SessionTab({ session, active, onSwitch, onClose, onRename }: SessionTabProps) {
+function SessionTab({ session, active, isMain, onSwitch, onClose, onRename }: SessionTabProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(session.name);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,18 +104,23 @@ function SessionTab({ session, active, onSwitch, onClose, onRename }: SessionTab
           autoFocus
         />
       ) : (
-        <span className="max-w-[100px] truncate">{session.name}</span>
+        <>
+          <span className="max-w-[100px] truncate">{session.name}</span>
+          {isMain && <span title="Linked to Telegram"><Link2 size={10} className="text-zinc-500 flex-shrink-0" /></span>}
+        </>
       )}
-      <button
-        onClick={(e) => { e.stopPropagation(); onClose(session.id); }}
-        className={`transition-colors flex-shrink-0 rounded ${
-          active
-            ? 'text-muted hover:text-primary'
-            : 'opacity-0 group-hover:opacity-100 text-muted hover:text-primary'
-        }`}
-      >
-        <X size={10} />
-      </button>
+      {!isMain && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onClose(session.id); }}
+          className={`transition-colors flex-shrink-0 rounded ${
+            active
+              ? 'text-muted hover:text-primary'
+              : 'opacity-0 group-hover:opacity-100 text-muted hover:text-primary'
+          }`}
+        >
+          <X size={10} />
+        </button>
+      )}
     </div>
   );
 }
@@ -94,15 +132,51 @@ export default function Chat({ onSend, typing }: Props) {
     newSession, switchSession, renameSession, deleteSession,
   } = useStore();
 
+
   const [input, setInput] = useState('');
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [commands, setCommands] = useState<CommandEntry[]>([]);
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [cmdIndex, setCmdIndex] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const paletteRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch('/api/commands')
+      .then((r) => r.json())
+      .then((data) => setCommands(data as CommandEntry[]))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typing]);
+
+  // Compute filtered commands whenever input changes
+  const cmdQuery = input.startsWith('/') ? input.slice(1).toLowerCase() : '';
+  const filteredCmds = cmdQuery !== undefined && input.startsWith('/')
+    ? commands.filter((c) => c.name.startsWith(cmdQuery))
+    : [];
+
+  // Keep index in bounds when filter changes
+  useEffect(() => {
+    setCmdIndex(0);
+  }, [cmdQuery]);
+
+  // Scroll active item into view
+  useEffect(() => {
+    if (!cmdOpen || filteredCmds.length === 0) return;
+    const item = paletteRef.current?.children[cmdIndex] as HTMLElement | undefined;
+    item?.scrollIntoView({ block: 'nearest' });
+  }, [cmdIndex, cmdOpen, filteredCmds.length]);
+
+  function selectCmd(cmd: CommandEntry) {
+    setInput(`/${cmd.name} `);
+    setCmdOpen(false);
+    textareaRef.current?.focus();
+  }
 
   function submit() {
     const trimmed = input.trim();
@@ -118,11 +192,35 @@ export default function Chat({ onSend, typing }: Props) {
     }
 
     setInput('');
+    setCmdOpen(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     onSend(content);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (cmdOpen && filteredCmds.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setCmdIndex((i) => Math.min(i + 1, filteredCmds.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setCmdIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && filteredCmds.length > 0 && input !== `/${filteredCmds[cmdIndex]?.name}`)) {
+        e.preventDefault();
+        if (filteredCmds[cmdIndex]) selectCmd(filteredCmds[cmdIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setCmdOpen(false);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       submit();
@@ -130,7 +228,9 @@ export default function Chat({ onSend, typing }: Props) {
   }
 
   function onInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setInput(e.target.value);
+    const val = e.target.value;
+    setInput(val);
+    setCmdOpen(val.startsWith('/'));
     const el = e.target;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
@@ -173,11 +273,12 @@ export default function Chat({ onSend, typing }: Props) {
     <div className="flex flex-col h-full">
       {/* Session tabs */}
       <div className="flex items-center border-b border-border overflow-x-auto flex-shrink-0">
-        {sessions.map((s) => (
+        {sessions.map((s, i) => (
           <SessionTab
             key={s.id}
             session={s}
             active={s.id === activeSessionId}
+            isMain={i === sessions.length - 1}
             onSwitch={switchSession}
             onClose={deleteSession}
             onRename={renameSession}
@@ -190,7 +291,7 @@ export default function Chat({ onSend, typing }: Props) {
         >
           <Plus size={12} />
         </button>
-        <div className="ml-auto pr-4">
+        <div className="ml-auto pr-4 flex items-center gap-3">
           <button
             onClick={clearChat}
             title="Clear chat"
@@ -218,8 +319,8 @@ export default function Chat({ onSend, typing }: Props) {
             {messages.map((msg) =>
               msg.role === 'user' ? (
                 <div key={msg.id} className="flex justify-end">
-                  <div className="bg-elevated rounded-2xl rounded-tr-md px-4 py-2.5 text-primary text-sm max-w-xl">
-                    {msg.content}
+                  <div className="bg-elevated rounded-2xl rounded-tr-md px-4 py-2.5 text-primary text-sm max-w-xl break-words">
+                    {renderUserContent(msg.content)}
                   </div>
                 </div>
               ) : (
@@ -279,43 +380,70 @@ export default function Chat({ onSend, typing }: Props) {
           </div>
         )}
 
-        <div className="flex items-end gap-2 bg-elevated rounded-2xl border border-border px-3 py-3">
-          {/* Upload */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept=".txt,.md,.py,.js,.ts,.jsx,.tsx,.json,.yaml,.yml,.toml,.html,.css,.xml,.csv,.pdf,.png,.jpg,.jpeg,.gif,.webp"
-            onChange={onFileSelect}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            title="Attach file"
-            className="text-muted hover:text-primary transition-colors flex-shrink-0 mb-0.5"
-          >
-            <Paperclip size={15} />
-          </button>
+        {/* Command palette — floats above input */}
+        <div className="relative">
+          {cmdOpen && filteredCmds.length > 0 && (
+            <div
+              ref={paletteRef}
+              className="absolute bottom-full mb-2 left-0 right-0 bg-elevated border border-border rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto z-50"
+            >
+              {filteredCmds.map((cmd, i) => (
+                <button
+                  key={cmd.name}
+                  onMouseDown={(e) => { e.preventDefault(); selectCmd(cmd); }}
+                  className={`w-full flex items-baseline gap-3 px-4 py-2.5 text-left transition-colors ${
+                    i === cmdIndex
+                      ? 'bg-accent/15 text-primary'
+                      : 'text-primary hover:bg-surface'
+                  }`}
+                >
+                  <span className="text-accent text-sm font-mono font-medium flex-shrink-0">
+                    /{cmd.name}
+                  </span>
+                  <span className="text-muted text-xs truncate">{cmd.description}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={onInput}
-            onKeyDown={onKeyDown}
-            placeholder="Message Thrall…"
-            rows={1}
-            className="flex-1 bg-transparent text-primary text-sm resize-none outline-none placeholder-muted leading-relaxed"
-            style={{ minHeight: '1.25rem' }}
-          />
-          <button
-            onClick={submit}
-            disabled={(!input.trim() && attachedImages.length === 0) || typing}
-            className="w-7 h-7 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
-          >
-            <Send size={13} className="text-white" />
-          </button>
+          <div className="flex items-end gap-2 bg-elevated rounded-2xl border border-border px-3 py-3">
+            {/* Upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept=".txt,.md,.py,.js,.ts,.jsx,.tsx,.json,.yaml,.yml,.toml,.html,.css,.xml,.csv,.pdf,.png,.jpg,.jpeg,.gif,.webp"
+              onChange={onFileSelect}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              title="Attach file"
+              className="text-muted hover:text-primary transition-colors flex-shrink-0 mb-0.5"
+            >
+              <Paperclip size={15} />
+            </button>
+
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={onInput}
+              onKeyDown={onKeyDown}
+              placeholder="Message Thrall…"
+              rows={1}
+              className="flex-1 bg-transparent text-primary text-sm resize-none outline-none placeholder-muted leading-relaxed"
+              style={{ minHeight: '1.25rem' }}
+            />
+            <button
+              onClick={submit}
+              disabled={(!input.trim() && attachedImages.length === 0) || typing}
+              className="w-7 h-7 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
+            >
+              <Send size={13} className="text-white" />
+            </button>
+          </div>
         </div>
         <p className="text-center text-muted text-xs mt-2 select-none">
-          Enter to send · Shift+Enter for new line · Double-click tab to rename
+          Enter to send · Shift+Enter for new line · Tab to complete command
         </p>
       </div>
     </div>
