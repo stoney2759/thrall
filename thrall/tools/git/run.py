@@ -56,7 +56,9 @@ async def execute(call: ToolCall) -> ToolResult:
     if returncode != 0:
         return _result(call.id, error=f"exit {returncode}\n{combined}", start=start)
 
-    return _result(call.id, output=combined or "(no output)", start=start)
+    msg = combined if combined else "(no output)"
+    msg += "\n[Verify before reporting completion.]"
+    return _result(call.id, output=msg, start=start)
 
 
 def _result(call_id: UUID, start: float, output: str | None = None, error: str | None = None) -> ToolResult:

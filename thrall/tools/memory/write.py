@@ -26,7 +26,7 @@ async def execute(call: ToolCall) -> ToolResult:
             allowed = await store.write_episode(episode)
             if not allowed:
                 return _result(call.id, error="memory gate denied episode", start=start)
-            return _result(call.id, output=f"episode written: {episode.id}", start=start)
+            return _result(call.id, output=f"episode written: {episode.id}\n[Verify before reporting completion.]", start=start)
 
         elif layer == "semantic":
             confidence = float(call.args.get("confidence", 1.0))
@@ -35,7 +35,7 @@ async def execute(call: ToolCall) -> ToolResult:
             allowed = await store.write_fact(fact)
             if not allowed:
                 return _result(call.id, error="memory gate denied fact", start=start)
-            return _result(call.id, output=f"fact written: {fact.id}", start=start)
+            return _result(call.id, output=f"fact written: {fact.id}\n[Verify before reporting completion.]", start=start)
 
         else:
             return _result(call.id, error=f"unknown layer: {layer}", start=start)

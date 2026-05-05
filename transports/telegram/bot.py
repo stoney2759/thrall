@@ -24,6 +24,26 @@ from bootstrap import state
 from constants.telegram import TG_MAX_LENGTH
 
 
+# ── Bot reference (for proactive sends from other transports) ─────────────────
+
+_app: Application | None = None
+
+
+async def send_to_primary_user(text: str) -> None:
+    """Send a message to the primary Telegram user. Used by webapp transport for bidirectional sync."""
+    if _app is None:
+        return
+    allowed: list = state.get_config().get("transports", {}).get("telegram", {}).get("allowed_user_ids", [])
+    if not allowed:
+        return
+    chunks = [text[i:i + TG_MAX_LENGTH] for i in range(0, len(text), TG_MAX_LENGTH)]
+    for chunk in chunks:
+        try:
+            await _app.bot.send_message(chat_id=allowed[0], text=chunk)
+        except Exception:
+            pass
+
+
 # ── Session ID ────────────────────────────────────────────────────────────────
 
 def _session_id(user_id: int) -> uuid.UUID:
@@ -444,6 +464,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await _send_audio(update, response)
         else:
             await _send(update, response)
+        # Mirror conversation to webapp
+        try:
+            from transports.desktop.manager import sync_message
+            await sync_message("user", user_text)
+            await sync_message("assistant", response)
+        except Exception:
+            pass
     except Exception as e:
         import traceback
         state.log_error(f"Telegram handler error: {e}\n{traceback.format_exc()}")
@@ -785,9 +812,11 @@ async def set_commands(app: Application) -> None:
 
 
 async def run() -> None:
+    global _app
     from scheduler import runner
 
     app = build_application()
+    _app = app
 
     async with app:
         await app.initialize()

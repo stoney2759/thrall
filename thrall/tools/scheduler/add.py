@@ -48,7 +48,7 @@ async def execute(call: ToolCall) -> ToolResult:
 
     return _result(
         call.id,
-        output=f"Job `{job.id}` scheduled ({job.schedule_summary()}): {task[:80]}",
+        output=f"Job `{job.id}` scheduled ({job.schedule_summary()}): {task[:80]}\n[Verify before reporting completion.]",
         start=start,
     )
 

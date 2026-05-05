@@ -2,6 +2,7 @@
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
 from thrall.tools.filesystem._resolve import resolve, is_protected
+from constants.tools import CODE_EXTS
 import time
 
 
@@ -15,7 +16,11 @@ def execute(call: ToolCall) -> ToolResult:
             return _result(call.id, error=f"path not found: {path}", start=start)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
-        return _result(call.id, output=f"written: {path}", start=start)
+        msg = f"written: {path}\n[Verify with filesystem_ls before reporting completion."
+        if path.suffix in CODE_EXTS:
+            msg += " This is a code file — re-read it and check for: string interpolation in shell/subprocess calls, hardcoded paths, argument escaping, and logic errors before reporting done."
+        msg += "]"
+        return _result(call.id, output=msg, start=start)
     except PermissionError:
         return _result(call.id, error=f"permission denied: {path}", start=start)
     except Exception as e:

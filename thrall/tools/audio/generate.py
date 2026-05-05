@@ -52,7 +52,7 @@ async def execute(call: ToolCall) -> ToolResult:
         if not should_cache_short():
             path.write_bytes(audio_bytes)
 
-    return _result(call.id, output=str(path), start=start)
+    return _result(call.id, output=f"{path}\n[Verify before reporting completion.]", start=start)
 
 
 def _deliver_path(title: str, audio: bytes, ext: str) -> Path:

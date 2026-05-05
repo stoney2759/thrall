@@ -20,6 +20,7 @@ export default function App() {
     const client = createWsClient(token, {
       onStatus: setWsStatus,
       onMessage: (content) => addMessage('assistant', content),
+      onSync: (role, content) => addMessage(role, content),
       onError: (msg) => addMessage('assistant', `[error] ${msg}`),
       onSessionId: setSessionId,
     });

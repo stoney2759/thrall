@@ -146,7 +146,7 @@ async def execute(call: ToolCall) -> ToolResult:
                     error_msg += f"\n{err[:2000]}"
                 return _result(call.id, error=error_msg, start=start)
             
-            return _result(call.id, output=f"Converted {input_path} to {output_path}", start=start)
+            return _result(call.id, output=f"Converted {input_path} to {output_path}\n[Verify before reporting completion.]", start=start)
         
         elif operation == "extract_audio":
             if not output_path:
@@ -177,7 +177,7 @@ async def execute(call: ToolCall) -> ToolResult:
                     error_msg += f"\n{err[:2000]}"
                 return _result(call.id, error=error_msg, start=start)
             
-            return _result(call.id, output=f"Extracted audio from {input_path} to {output_path}", start=start)
+            return _result(call.id, output=f"Extracted audio from {input_path} to {output_path}\n[Verify before reporting completion.]", start=start)
         
         elif operation == "trim":
             if not output_path:
@@ -200,7 +200,7 @@ async def execute(call: ToolCall) -> ToolResult:
                     error_msg += f"\n{err[:2000]}"
                 return _result(call.id, error=error_msg, start=start)
             
-            return _result(call.id, output=f"Trimmed {input_path} from {start_time} to {output_path}", start=start)
+            return _result(call.id, output=f"Trimmed {input_path} from {start_time} to {output_path}\n[Verify before reporting completion.]", start=start)
         
         elif operation == "thumbnail":
             if not output_path:
@@ -218,7 +218,7 @@ async def execute(call: ToolCall) -> ToolResult:
                     error_msg += f"\n{err[:2000]}"
                 return _result(call.id, error=error_msg, start=start)
             
-            return _result(call.id, output=f"Extracted thumbnail from {input_path} at {timestamp} to {output_path}", start=start)
+            return _result(call.id, output=f"Extracted thumbnail from {input_path} at {timestamp} to {output_path}\n[Verify before reporting completion.]", start=start)
         
         elif operation == "extract_frames":
             output_dir = call.args.get("output_dir", "")
@@ -243,7 +243,7 @@ async def execute(call: ToolCall) -> ToolResult:
                 return _result(call.id, error=f"ffmpeg extract_frames failed (code {returncode})\n{err[:2000]}", start=start)
 
             frame_files = sorted(f for f in os.listdir(output_dir) if f.startswith("frame_"))
-            return _result(call.id, output=f"Extracted {len(frame_files)} frames to {output_dir}\nFiles: {', '.join(frame_files)}", start=start)
+            return _result(call.id, output=f"Extracted {len(frame_files)} frames to {output_dir}\nFiles: {', '.join(frame_files)}\n[Verify before reporting completion.]", start=start)
 
         elif operation == "concat":
             input_paths = call.args.get("input_paths", [])
@@ -273,7 +273,7 @@ async def execute(call: ToolCall) -> ToolResult:
             if returncode != 0:
                 return _result(call.id, error=f"ffmpeg concat failed (code {returncode})\n{err[:2000]}", start=start)
 
-            return _result(call.id, output=f"Concatenated {len(resolved)} files to {output_path}", start=start)
+            return _result(call.id, output=f"Concatenated {len(resolved)} files to {output_path}\n[Verify before reporting completion.]", start=start)
 
         elif operation == "compress":
             if not output_path:
@@ -321,7 +321,7 @@ async def execute(call: ToolCall) -> ToolResult:
             if returncode != 0:
                 return _result(call.id, error=f"ffmpeg gif failed (code {returncode})\n{err[:2000]}", start=start)
 
-            return _result(call.id, output=f"Created GIF at {output_path}", start=start)
+            return _result(call.id, output=f"Created GIF at {output_path}\n[Verify before reporting completion.]", start=start)
 
         else:
             return _result(call.id, error=f"unknown operation: {operation}", start=start)

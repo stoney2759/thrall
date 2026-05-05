@@ -13,7 +13,7 @@ async def execute(call: ToolCall) -> ToolResult:
     from scheduler import store
     deleted = store.delete_job(job_id)
     if deleted:
-        return _result(call.id, output=f"Job `{job_id}` deleted.", start=start)
+        return _result(call.id, output=f"Job `{job_id}` deleted.\n[Verify before reporting completion.]", start=start)
     return _result(call.id, error=f"No job found with id '{job_id}'.", start=start)
 
 

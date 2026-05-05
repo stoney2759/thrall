@@ -28,7 +28,12 @@ def _run_sync(command: str, cwd: str | None, timeout: int, env: dict) -> tuple[i
 async def execute(call: ToolCall) -> ToolResult:
     start = time.monotonic()
     command = call.args.get("command", "").strip()
-    cwd = call.args.get("cwd") or state.get_workspace_dir() or None
+    _cwd = call.args.get("cwd")
+    workspace = state.get_workspace_dir()
+    if _cwd and not os.path.isabs(_cwd):
+        cwd = os.path.join(workspace, _cwd) if workspace else _cwd
+    else:
+        cwd = _cwd or workspace or None
     timeout = int(call.args.get("timeout", _DEFAULT_TIMEOUT))
 
     if not command:
@@ -54,7 +59,9 @@ async def execute(call: ToolCall) -> ToolResult:
     if returncode != 0:
         return _result(call.id, error=f"exit {returncode}\n{combined}", start=start)
 
-    return _result(call.id, output=combined or "(no output)", start=start)
+    msg = combined if combined else "(no output — normal for destructive commands like rm, del, mv, mkdir)"
+    msg += "\n[Verify the result with filesystem_ls or filesystem_stat before reporting completion.]"
+    return _result(call.id, output=msg, start=start)
 
 
 def _result(call_id: UUID, start: float, output: str | None = None, error: str | None = None) -> ToolResult:

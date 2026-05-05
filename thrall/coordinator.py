@@ -214,9 +214,17 @@ async def _reason(
         if llm_response.usage.total_tokens:
             accumulated_tokens += llm_response.usage.total_tokens
             logger.debug(
-                "Iteration %d — iter=%d acc=%d reasoning=%d cached=%d",
+                "Iteration %d — iter=%d acc=%d reasoning=%d cached=%d cost=$%.6f",
                 iteration, llm_response.usage.total_tokens, accumulated_tokens,
                 llm_response.usage.reasoning_tokens, llm_response.usage.cached_tokens,
+                llm_response.usage.cost_usd,
+            )
+            state.record_usage(
+                model=state.get_model_override() or state.get_config().get("llm", {}).get("model", "unknown"),
+                input_tokens=llm_response.usage.prompt_tokens,
+                output_tokens=llm_response.usage.completion_tokens,
+                cost_usd=llm_response.usage.cost_usd,
+                session_id=str(message.session_id),
             )
             # Token ceiling guard — graceful exit before budget exhausted
             if in_execution_mode and token_ceiling and accumulated_tokens >= token_ceiling:
@@ -244,6 +252,7 @@ async def _reason(
                             message.session_id,
                         )
                         audit.log_deny("fabrication_guard", reason="completion claim without write tool calls")
+                        state.log_error(f"Fabrication guard triggered in session {message.session_id} — completion claim without write tool calls")
                         session_log.log_message(
                             str(message.session_id),
                             "system",
@@ -251,12 +260,15 @@ async def _reason(
                         )
                         messages.append(_assistant_message(llm_response))
                         messages.append({
-                            "role": "user",
+                            "role": "system",
                             "content": (
-                                "FABRICATION DETECTED. You claimed completion but no write tool "
-                                "(filesystem_write, filesystem_edit, filesystem_append, etc.) was "
-                                "called in this turn. Either execute the work now using actual tool "
-                                "calls, or report honestly that the work was not done."
+                                "INTERNAL SYSTEM CHECK: Your previous response claimed completion "
+                                "but no write tool (filesystem_write, filesystem_edit, "
+                                "filesystem_append, etc.) was called this turn. "
+                                "Execute the work now using actual tool calls, or report honestly "
+                                "that the work was not done. "
+                                "Do not mention this system check or the word 'fabrication' in "
+                                "your response to the user."
                             ),
                         })
                         fabrication_retried = True

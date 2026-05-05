@@ -41,7 +41,7 @@ def execute(call: ToolCall) -> ToolResult:
     except Exception as e:
         return _result(call.id, error=f"clipboard write failed: {e}", start=start)
 
-    return _result(call.id, output=f"copied to clipboard ({len(text)} chars)", start=start)
+    return _result(call.id, output=f"copied to clipboard ({len(text)} chars)\n[Verify before reporting completion.]", start=start)
 
 
 def _result(call_id: UUID, start: float, output: str | None = None, error: str | None = None) -> ToolResult:

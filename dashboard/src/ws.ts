@@ -4,12 +4,14 @@ type InboundFrame =
   | { type: 'ready'; session_id: string }
   | { type: 'typing' }
   | { type: 'response'; content: string; reasoning: string | null }
+  | { type: 'sync'; role: 'user' | 'assistant'; content: string }
   | { type: 'pong' }
   | { type: 'error'; message: string };
 
 export interface WsCallbacks {
   onStatus: (s: WsStatus) => void;
   onMessage: (content: string) => void;
+  onSync: (role: 'user' | 'assistant', content: string) => void;
   onError: (msg: string) => void;
   onSessionId: (id: string) => void;
 }
@@ -56,6 +58,8 @@ export function createWsClient(token: string, callbacks: WsCallbacks): WsClient 
       } else if (frame.type === 'response') {
         callbacks.onMessage(frame.content);
         callbacks.onStatus('ready');
+      } else if (frame.type === 'sync') {
+        callbacks.onSync(frame.role, frame.content);
       } else if (frame.type === 'error') {
         callbacks.onError(frame.message);
         callbacks.onStatus('ready');

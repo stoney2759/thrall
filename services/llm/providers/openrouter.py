@@ -169,6 +169,7 @@ def _parse_usage(data: dict) -> LLMUsage:
         total_tokens=u.get("total_tokens", 0),
         reasoning_tokens=u.get("reasoning_tokens", 0),
         cached_tokens=u.get("cached_tokens", 0),
+        cost_usd=float(u.get("cost", 0.0)),
     )
 
 

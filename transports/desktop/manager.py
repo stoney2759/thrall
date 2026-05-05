@@ -15,6 +15,15 @@ def unregister(ws: WebSocket) -> None:
 
 async def broadcast(content: str) -> None:
     frame = json.dumps({"type": "response", "content": content}, ensure_ascii=False)
+    await _send_all(frame)
+
+
+async def sync_message(role: str, content: str) -> None:
+    frame = json.dumps({"type": "sync", "role": role, "content": content}, ensure_ascii=False)
+    await _send_all(frame)
+
+
+async def _send_all(frame: str) -> None:
     dead: set[WebSocket] = set()
     for ws in _connections:
         try:

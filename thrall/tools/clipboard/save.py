@@ -20,7 +20,7 @@ def execute(call: ToolCall) -> ToolResult:
     except Exception as e:
         return _result(call.id, error=f"failed to save snippet: {e}", start=start)
 
-    return _result(call.id, output=f"saved snippet '{name}' ({len(content)} chars)", start=start)
+    return _result(call.id, output=f"saved snippet '{name}' ({len(content)} chars)\n[Verify before reporting completion.]", start=start)
 
 
 def _result(call_id: UUID, start: float, output: str | None = None, error: str | None = None) -> ToolResult:

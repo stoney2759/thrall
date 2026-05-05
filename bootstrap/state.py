@@ -1,8 +1,12 @@
 from __future__ import annotations
 import asyncio
+import json
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
+
+_COST_FILE = os.path.join(os.path.dirname(__file__), "..", "state", "cost.json")
 
 # DAG LEAF — imports nothing from this project. stdlib only.
 # Every module that needs shared runtime state imports from here.
@@ -29,6 +33,7 @@ class _State:
 
     # Cost + token tracking
     model_usage: dict[str, _ModelUsage] = field(default_factory=dict)
+    session_costs: dict[str, float] = field(default_factory=dict)
     total_cost_usd: float = 0.0
 
     # Active tasks
@@ -108,7 +113,35 @@ def get_config() -> dict:
 
 # ── Cost + tokens ─────────────────────────────────────────────────────────────
 
-def record_usage(model: str, input_tokens: int, output_tokens: int, cost_usd: float) -> None:
+def _load_cost() -> None:
+    try:
+        with open(_COST_FILE) as f:
+            data = json.load(f)
+        _STATE.total_cost_usd = data.get("total_cost_usd", 0.0)
+        for model, u in data.get("model_usage", {}).items():
+            _STATE.model_usage[model] = _ModelUsage(
+                input_tokens=u.get("input_tokens", 0),
+                output_tokens=u.get("output_tokens", 0),
+                cost_usd=u.get("cost_usd", 0.0),
+            )
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+def _save_cost() -> None:
+    os.makedirs(os.path.dirname(_COST_FILE), exist_ok=True)
+    data = {
+        "total_cost_usd": _STATE.total_cost_usd,
+        "model_usage": {
+            model: {"input_tokens": u.input_tokens, "output_tokens": u.output_tokens, "cost_usd": u.cost_usd}
+            for model, u in _STATE.model_usage.items()
+        },
+    }
+    tmp = _COST_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp, _COST_FILE)
+
+def record_usage(model: str, input_tokens: int, output_tokens: int, cost_usd: float, session_id: str | None = None) -> None:
     if model not in _STATE.model_usage:
         _STATE.model_usage[model] = _ModelUsage()
     usage = _STATE.model_usage[model]
@@ -116,11 +149,19 @@ def record_usage(model: str, input_tokens: int, output_tokens: int, cost_usd: fl
     usage.output_tokens += output_tokens
     usage.cost_usd += cost_usd
     _STATE.total_cost_usd += cost_usd
+    if session_id:
+        _STATE.session_costs[session_id] = _STATE.session_costs.get(session_id, 0.0) + cost_usd
+    _save_cost()
 
 def get_total_cost() -> float:
+    _load_cost()
     return _STATE.total_cost_usd
 
+def get_session_cost(session_id: str) -> float:
+    return _STATE.session_costs.get(session_id, 0.0)
+
 def get_model_usage() -> dict[str, _ModelUsage]:
+    _load_cost()
     return _STATE.model_usage
 
 

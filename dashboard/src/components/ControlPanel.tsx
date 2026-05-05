@@ -10,6 +10,8 @@ interface StatusData {
   model_overridden: boolean;
   tasks: number;
   cost_usd: number;
+  cost_local: number;
+  currency: string;
   uptime_seconds: number;
   reasoning_effort: string | null;
   errors: number;
@@ -226,7 +228,7 @@ export default function ControlPanel() {
               <span className={data.tasks > 0 ? 'text-yellow-400' : ''}>{data.tasks}</span>
             </Row>
             <Row label="Session cost">
-              ${(data.cost_usd ?? 0).toFixed(4)}
+              {(data.cost_local ?? data.cost_usd ?? 0).toFixed(6)} {data.currency ?? 'USD'}
             </Row>
             <Row label="Uptime">
               {formatUptime(data.uptime_seconds)}
