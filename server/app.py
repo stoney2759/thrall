@@ -1,5 +1,6 @@
 from __future__ import annotations
 import time
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
 from fastapi import FastAPI, WebSocket
@@ -8,6 +9,33 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from bootstrap import startup
 import os
+
+# ── Exchange rate cache ───────────────────────────────────────────────────────
+_fx_rate: float = 1.0
+_fx_currency: str = "USD"
+_fx_last_fetch: float = 0.0
+_FX_TTL = 3600  # 1 hour
+
+async def _get_fx_rate(target: str) -> float:
+    global _fx_rate, _fx_currency, _fx_last_fetch
+    if target == "USD":
+        return 1.0
+    now = time.time()
+    if _fx_currency == target and now - _fx_last_fetch < _FX_TTL:
+        return _fx_rate
+    try:
+        import urllib.request
+        url = f"https://api.frankfurter.app/latest?from=USD&to={target}"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            import json
+            data = json.loads(resp.read())
+            rate = float(data["rates"][target])
+            _fx_rate = rate
+            _fx_currency = target
+            _fx_last_fetch = now
+            return rate
+    except Exception:
+        return _fx_rate or 1.0
 
 _START_TIME = time.time()
 
@@ -57,6 +85,9 @@ async def api_status():
     llm_cfg = state.get_config().get("llm", {})
     model = state.get_model_override() or llm_cfg.get("model", "unknown")
     config_model = llm_cfg.get("model", "unknown")
+    currency = state.get_config().get("server", {}).get("currency", "USD")
+    cost_usd = state.get_total_cost()
+    fx = await _get_fx_rate(currency)
     return JSONResponse({
         "status": "ok",
         "version": cfg.get("version", "2.0.0"),
@@ -64,11 +95,30 @@ async def api_status():
         "config_model": config_model,
         "model_overridden": state.get_model_override() is not None,
         "tasks": state.get_active_task_count(),
-        "cost_usd": state.get_total_cost(),
+        "cost_usd": cost_usd,
+        "cost_local": round(cost_usd * fx, 6),
+        "currency": currency,
+        "fx_rate": fx,
         "uptime_seconds": int(time.time() - _START_TIME),
         "reasoning_effort": state.get_reasoning_effort(),
         "errors": len(state.get_error_log()),
     })
+
+
+@app.get("/api/memory/session")
+async def api_memory_session():
+    from services.session_memory import session_memory
+    result = []
+    for sid in session_memory.all_sessions():
+        context = session_memory.get_context(sid)
+        if context:
+            result.append({
+                "session_id": str(sid),
+                "turns": len(context),
+                "tokens": session_memory.estimate_tokens(sid),
+                "context": context,
+            })
+    return JSONResponse(result)
 
 
 @app.get("/api/memory/episodes")

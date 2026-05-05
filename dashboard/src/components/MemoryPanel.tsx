@@ -66,7 +66,7 @@ function EpisodeCard({
               ROLE_COLORS[episode.role] ?? 'bg-zinc-800 text-zinc-400'
             }`}
           >
-            {episode.role}
+            {episode.role === 'assistant' ? 'Thrall' : episode.role}
           </span>
           <span className="text-zinc-600 text-xs font-mono">
             {episode.timestamp.slice(0, 16).replace('T', ' ')}

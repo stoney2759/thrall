@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Send, RotateCcw, Plus, Paperclip, X, Link2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useStore } from '../store';
 import type { Session } from '../store';
 
@@ -21,6 +22,37 @@ interface CommandEntry {
 
 const IMG_BLOCK = /\[Image: ([^\]]+)\]\n(data:image\/[^\s]+)/g;
 
+const USER_MD_COMPONENTS = {
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="mb-1 last:mb-0">{children}</p>
+  ),
+  code: ({ inline, children }: { inline?: boolean; children?: React.ReactNode }) =>
+    inline ? (
+      <code className="bg-black/20 rounded px-1 py-0.5 font-mono text-xs">{children}</code>
+    ) : (
+      <pre className="bg-black/20 rounded-lg px-3 py-2 my-1.5 font-mono text-xs overflow-x-auto whitespace-pre">
+        <code>{children}</code>
+      </pre>
+    ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-disc pl-4 mb-1 space-y-0.5">{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="list-decimal pl-4 mb-1 space-y-0.5">{children}</ol>
+  ),
+  table: ({ children }: { children?: React.ReactNode }) => (
+    <div className="overflow-x-auto my-2">
+      <table className="text-xs border-collapse w-full">{children}</table>
+    </div>
+  ),
+  th: ({ children }: { children?: React.ReactNode }) => (
+    <th className="border border-border px-2 py-1 text-left font-medium text-muted bg-surface">{children}</th>
+  ),
+  td: ({ children }: { children?: React.ReactNode }) => (
+    <td className="border border-border px-2 py-1">{children}</td>
+  ),
+};
+
 function renderUserContent(content: string) {
   const parts: React.ReactNode[] = [];
   let last = 0;
@@ -28,7 +60,10 @@ function renderUserContent(content: string) {
   IMG_BLOCK.lastIndex = 0;
   while ((match = IMG_BLOCK.exec(content)) !== null) {
     if (match.index > last) {
-      parts.push(<span key={last}>{content.slice(last, match.index)}</span>);
+      const text = content.slice(last, match.index);
+      parts.push(
+        <ReactMarkdown key={last} remarkPlugins={[remarkGfm]} components={USER_MD_COMPONENTS}>{text}</ReactMarkdown>
+      );
     }
     parts.push(
       <div key={match.index} className="mt-2">
@@ -42,8 +77,12 @@ function renderUserContent(content: string) {
     );
     last = match.index + match[0].length;
   }
-  if (last < content.length) parts.push(<span key={last}>{content.slice(last)}</span>);
-  return parts.length > 0 ? parts : content;
+  if (last < content.length) {
+    parts.push(
+      <ReactMarkdown key={last} components={USER_MD_COMPONENTS}>{content.slice(last)}</ReactMarkdown>
+    );
+  }
+  return parts.length > 0 ? parts : <ReactMarkdown remarkPlugins={[remarkGfm]} components={USER_MD_COMPONENTS}>{content}</ReactMarkdown>;
 }
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -126,6 +165,15 @@ function SessionTab({ session, active, isMain, onSwitch, onClose, onRename }: Se
 }
 
 export default function Chat({ onSend, typing }: Props) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!typing) { setElapsed(0); return; }
+    const start = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 250);
+    return () => clearInterval(id);
+  }, [typing]);
+
   const {
     messages, clearChat,
     sessions, activeSessionId,
@@ -142,6 +190,59 @@ export default function Chat({ onSend, typing }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const paletteRef = useRef<HTMLDivElement>(null);
+
+  // Load draft for this session when session changes
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`thrall_draft_${activeSessionId}`) ?? '';
+      setInput(saved);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        if (saved) textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+      }
+    } catch { /* ignore */ }
+  }, [activeSessionId]);
+
+  // Persist draft on every keystroke
+  useEffect(() => {
+    if (!activeSessionId) return;
+    try {
+      if (input) localStorage.setItem(`thrall_draft_${activeSessionId}`, input);
+      else localStorage.removeItem(`thrall_draft_${activeSessionId}`);
+    } catch { /* ignore */ }
+  }, [input, activeSessionId]);
+
+  // /approve button — replaces the paragraph in assistant messages
+  const mdComponents = useMemo(() => ({
+    p({ children }: { children?: React.ReactNode }) {
+      const text = (Array.isArray(children) ? children : [children])
+        .map((c) => (typeof c === 'string' ? c : ''))
+        .join('')
+        .trim();
+      if (text === '/approve') {
+        return (
+          <button
+            onClick={() => onSend('/approve')}
+            className="mt-2 inline-flex items-center px-3 py-1.5 rounded-lg bg-accent/20 text-accent border border-accent/30 text-xs font-mono hover:bg-accent/30 active:scale-95 transition-all cursor-pointer"
+          >
+            /approve
+          </button>
+        );
+      }
+      return <p>{children}</p>;
+    },
+    table: ({ children }: { children?: React.ReactNode }) => (
+      <div className="overflow-x-auto my-2">
+        <table className="text-xs border-collapse w-full">{children}</table>
+      </div>
+    ),
+    th: ({ children }: { children?: React.ReactNode }) => (
+      <th className="border border-border px-2 py-1 text-left font-medium text-muted bg-surface">{children}</th>
+    ),
+    td: ({ children }: { children?: React.ReactNode }) => (
+      <td className="border border-border px-2 py-1">{children}</td>
+    ),
+  }), [onSend]);
 
   useEffect(() => {
     fetch('/api/commands')
@@ -194,6 +295,7 @@ export default function Chat({ onSend, typing }: Props) {
     setInput('');
     setCmdOpen(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    try { localStorage.removeItem(`thrall_draft_${activeSessionId}`); } catch { /* ignore */ }
     onSend(content);
   }
 
@@ -278,7 +380,7 @@ export default function Chat({ onSend, typing }: Props) {
             key={s.id}
             session={s}
             active={s.id === activeSessionId}
-            isMain={i === sessions.length - 1}
+            isMain={i === 0}
             onSwitch={switchSession}
             onClose={deleteSession}
             onRename={renameSession}
@@ -318,7 +420,8 @@ export default function Chat({ onSend, typing }: Props) {
           <div className="space-y-6 max-w-3xl mx-auto">
             {messages.map((msg) =>
               msg.role === 'user' ? (
-                <div key={msg.id} className="flex justify-end">
+                <div key={msg.id} className="flex flex-col items-end gap-0.5">
+                  <span className="text-xs text-muted px-1 select-none">You</span>
                   <div className="bg-elevated rounded-2xl rounded-tr-md px-4 py-2.5 text-primary text-sm max-w-xl break-words">
                     {renderUserContent(msg.content)}
                   </div>
@@ -328,8 +431,11 @@ export default function Chat({ onSend, typing }: Props) {
                   <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <span className="text-xs font-bold text-accent select-none">T</span>
                   </div>
-                  <div className="prose-thrall text-primary text-sm leading-relaxed flex-1 min-w-0">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="text-xs text-accent font-medium mb-1 select-none">Thrall</span>
+                    <div className="prose-thrall text-primary text-sm leading-relaxed">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{msg.content}</ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               ),
@@ -340,6 +446,68 @@ export default function Chat({ onSend, typing }: Props) {
                 <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-xs font-bold text-accent select-none">T</span>
                 </div>
+
+                {/* OPTION 1 — 5 balls, bounce */}
+                {/* <div className="flex gap-1 pt-2.5">
+                  {[0, 100, 200, 300, 400].map((delay) => (
+                    <span
+                      key={delay}
+                      className="w-1.5 h-1.5 rounded-full bg-muted animate-bounce"
+                      style={{ animationDelay: `${delay}ms` }}
+                    />
+                  ))}
+                </div> */}
+
+                {/* OPTION 3 — Torus of dots (parametric, R=7 major, r=3 tube, 14×6 grid) */}
+                <div className="flex items-center gap-2 pt-1.5">
+                <div style={{ transform: 'rotateZ(-30deg)' }}>
+                <div style={{ perspective: '120px' }}>
+                  <div
+                    className="relative animate-torus-spin"
+                    style={{ width: '22px', height: '22px', transformStyle: 'preserve-3d' }}
+                  >
+                    {Array.from({ length: 14 }).flatMap((_, ti) =>
+                      Array.from({ length: 6 }).map((_, pi) => {
+                        const theta = (ti / 14) * Math.PI * 2;
+                        const phi = (pi / 6) * Math.PI * 2;
+                        const R = 7;
+                        const r = 3;
+                        const x = (R + r * Math.cos(phi)) * Math.cos(theta);
+                        const y = (R + r * Math.cos(phi)) * Math.sin(theta);
+                        const z = r * Math.sin(phi);
+                        return (
+                          <span
+                            key={`${ti}-${pi}`}
+                            className="absolute rounded-full bg-muted"
+                            style={{
+                              width: '2px', height: '2px',
+                              top: 'calc(50% - 1px)', left: 'calc(50% - 1px)',
+                              transform: `translate3d(${x}px, ${y}px, ${z}px)`,
+                            }}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+                </div>
+                {elapsed > 0 && (
+                  <span className="text-xs text-muted tabular-nums select-none">
+                    {elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`}
+                  </span>
+                )}
+                </div>
+
+                {/* OPTION 2 — Newton's cradle */}
+                {/* <div className="flex gap-1 pt-2.5">
+                  <span className="w-[4.5px] h-[4.5px] rounded-full bg-muted animate-cradle-left" />
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className="w-[4.5px] h-[4.5px] rounded-full bg-muted" />
+                  ))}
+                  <span className="w-[4.5px] h-[4.5px] rounded-full bg-muted animate-cradle-right" />
+                </div> */}
+
+                {/* DEFAULT — 3 balls bounce (original)
                 <div className="flex gap-1 pt-2.5">
                   {[0, 150, 300].map((delay) => (
                     <span
@@ -348,7 +516,8 @@ export default function Chat({ onSend, typing }: Props) {
                       style={{ animationDelay: `${delay}ms` }}
                     />
                   ))}
-                </div>
+                </div> */}
+
               </div>
             )}
 
@@ -435,8 +604,7 @@ export default function Chat({ onSend, typing }: Props) {
             />
             <button
               onClick={submit}
-              disabled={(!input.trim() && attachedImages.length === 0) || typing}
-              className="w-7 h-7 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
+              className="w-7 h-7 rounded-lg bg-accent hover:bg-accent-hover flex items-center justify-center transition-colors flex-shrink-0"
             >
               <Send size={13} className="text-white" />
             </button>

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 import asyncio
 import os
 import subprocess
@@ -14,8 +14,7 @@ _DEFAULT_TIMEOUT = 300
 
 def _run_sync(command: str, cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
     result = subprocess.run(
-        command,
-        shell=True,
+        ["powershell", "-NoProfile", "-Command", command],
         capture_output=True,
         text=True,
         cwd=cwd,
@@ -59,7 +58,7 @@ async def execute(call: ToolCall) -> ToolResult:
     if returncode != 0:
         return _result(call.id, error=f"exit {returncode}\n{combined}", start=start)
 
-    msg = combined if combined else "(no output — normal for destructive commands like rm, del, mv, mkdir)"
+    msg = combined if combined else "(no output — normal for destructive commands like Remove-Item, Move-Item, mkdir)"
     msg += "\n[Verify the result with filesystem_ls or filesystem_stat before reporting completion.]"
     return _result(call.id, output=msg, start=start)
 
@@ -68,10 +67,10 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
     return ToolResult(call_id=call_id, output=output, error=error, duration_ms=int((time.monotonic() - start) * 1000))
 
 
-NAME = "shell_run"
-DESCRIPTION = "Run a shell command and return stdout/stderr. cwd defaults to the workspace directory. For GUI smoke tests use a short timeout (5-10s). Default timeout is 300s."
+NAME = "powershell_run"
+DESCRIPTION = "Run a PowerShell command via powershell -NoProfile -Command. Use for Windows-native operations, PowerShell cmdlets, and file system work. Prefer over shell_run for Windows file verification tasks."
 PARAMETERS = {
     "command": {"type": "string", "required": True},
     "cwd": {"type": "string", "required": False, "default": ""},
-    "timeout": {"type": "integer", "required": False, "default": 300, "description": "Timeout in seconds. Default 300. Use shorter values (5-10) for GUI smoke tests or long-running daemons."},
+    "timeout": {"type": "integer", "required": False, "default": 300, "description": "Timeout in seconds. Default 300."},
 }

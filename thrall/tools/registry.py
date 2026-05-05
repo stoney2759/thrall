@@ -14,6 +14,7 @@ from thrall.tools.code import execute as code_execute
 from thrall.tools.memory import read as mem_read, write as mem_write
 from thrall.tools.agents import spawn, result as agent_result, await_all, list as agent_list, create as agent_create, prepare as agent_prepare
 from thrall.tools.shell import run as shell_run
+from thrall.tools.shell import powershell as powershell_run
 from thrall.tools.scheduler import add as sched_add, list as sched_list, delete as sched_delete
 from thrall.tools.git import run as git_run
 from thrall.tools.clipboard import read as clip_read, write as clip_write, save as clip_save, load as clip_load, snippets as clip_snippets
@@ -60,6 +61,7 @@ _TOOLS: dict = {
     agent_create.NAME: agent_create.execute,
     agent_prepare.NAME: agent_prepare.execute,
     shell_run.NAME: shell_run.execute,
+    powershell_run.NAME: powershell_run.execute,
     sched_add.NAME: sched_add.execute,
     sched_list.NAME: sched_list.execute,
     sched_delete.NAME: sched_delete.execute,
@@ -118,6 +120,7 @@ _SCHEMAS: dict = {
     agent_create.NAME: (agent_create.DESCRIPTION, agent_create.PARAMETERS),
     agent_prepare.NAME: (agent_prepare.DESCRIPTION, agent_prepare.PARAMETERS),
     shell_run.NAME: (shell_run.DESCRIPTION, shell_run.PARAMETERS),
+    powershell_run.NAME: (powershell_run.DESCRIPTION, powershell_run.PARAMETERS),
     sched_add.NAME: (sched_add.DESCRIPTION, sched_add.PARAMETERS),
     sched_list.NAME: (sched_list.DESCRIPTION, sched_list.PARAMETERS),
     sched_delete.NAME: (sched_delete.DESCRIPTION, sched_delete.PARAMETERS),

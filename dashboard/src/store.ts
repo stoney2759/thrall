@@ -100,7 +100,7 @@ export const useStore = create<Store>((set) => ({
   newSession: () =>
     set((s) => {
       const sess = _makeSession();
-      const sessions = [sess, ...s.sessions];
+      const sessions = [...s.sessions, sess];
       _saveSessions(sessions);
       return { sessions, activeSessionId: sess.id, messages: [] };
     }),

@@ -1,11 +1,23 @@
 from __future__ import annotations
+import asyncio
 import json
 import os
+import uuid
 from uuid import uuid4
 from fastapi import WebSocket, WebSocketDisconnect
 from schemas.message import Message, Role, Transport
+from bootstrap import state
 from thrall import coordinator
 from transports.desktop import manager
+
+_WS_COORDINATOR_TIMEOUT = 600  # 10 min hard cap on any single coordinator call
+
+
+def _primary_telegram_session() -> uuid.UUID:
+    allowed = state.get_config().get("transports", {}).get("telegram", {}).get("allowed_user_ids", [])
+    if allowed:
+        return uuid.uuid5(uuid.NAMESPACE_DNS, f"telegram:{allowed[0]}")
+    return uuid4()
 
 
 async def handle(ws: WebSocket) -> None:
@@ -31,7 +43,7 @@ async def handle(ws: WebSocket) -> None:
         await ws.close(code=1008)
         return
 
-    session_id = uuid4()
+    session_id = _primary_telegram_session()
     await _send(ws, {"type": "ready", "session_id": str(session_id)})
     manager.register(ws)
 
@@ -71,7 +83,20 @@ async def handle(ws: WebSocket) -> None:
                     transport=Transport.API,
                     user_id="desktop",
                 )
-                response = await coordinator.receive(message)
+                try:
+                    response = await asyncio.wait_for(
+                        coordinator.receive(message),
+                        timeout=_WS_COORDINATOR_TIMEOUT,
+                    )
+                except asyncio.TimeoutError:
+                    response = "Request timed out after 10 minutes."
+
+                # Mirror response to Telegram on the linked session
+                try:
+                    from transports.telegram.bot import send_to_primary_user
+                    asyncio.create_task(send_to_primary_user(response))
+                except Exception:
+                    pass
 
             await _send(ws, {"type": "response", "content": response, "reasoning": None})
 

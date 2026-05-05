@@ -36,7 +36,8 @@ Complete tool reference. Tools are called natively by the reasoning loop.
 - `code_execute` — run Python; returns stdout, stderr, exit code
 
 ## Shell
-- `shell_run` — run a shell command; returns output. On Windows use forward slashes or escape backslashes in paths. For Windows-native operations prefix with `powershell -Command`.
+- `shell_run` — run a shell command; returns output. On Windows, avoid using `ls` or `dir` for file verification; use filesystem tools instead.
+- `powershell_run` — run a PowerShell command via `powershell -NoProfile -Command`. Use for Windows-native operations, PowerShell cmdlets, and file system work. Prefer over `shell_run` for Windows file verification tasks.
 
 ## Git
 - `git_run` — run a git command in the workspace repository
