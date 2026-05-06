@@ -297,35 +297,34 @@ async def _reason(
         # Add assistant message with tool calls to context (includes reasoning for roundtrip)
         messages.append(_assistant_message(llm_response))
 
-        # Execute each tool call
-        for tc in llm_response.tool_calls:
+        # Execute tool calls concurrently
+        async def _exec_one(tc):
             tool_call = ToolCall(
                 session_id=message.session_id,
                 name=tc.name,
                 args=tc.args,
                 caller="thrall",
             )
-
-            # Gate 3 — tool permission
             if not tool_gate.is_allowed(tool_call):
-                messages.append(_tool_result_message(tc.id, "denied: tool gate blocked this call"))
                 session_log.log_tool_result(str(message.session_id), tc.name, "denied: tool gate blocked this call")
-                continue
-
-            # Execute
+                return tc.id, "denied: tool gate blocked this call", tool_call, None
             session_log.log_tool_call(str(message.session_id), tc.name, tc.args)
             result = await tools.execute(tc.name, tc.args, message.session_id, "thrall")
-            tools_called.add(tc.name)
             if result.output:
                 output = result.output
             elif result.error:
                 output = f"TOOL FAILED: {result.error}"
             else:
                 output = "TOOL RETURNED NO OUTPUT — the operation did not execute or produced nothing. Do not assume success. Report this failure loudly to the user before proceeding."
+            return tc.id, output, tool_call, result
 
-            audit.log_allow("tool_gate", tool_call, reason=f"executed in {result.duration_ms}ms")
-            session_log.log_tool_result(str(message.session_id), tc.name, result.output, result.error, result.duration_ms)
-            messages.append(_tool_result_message(tc.id, output))
+        gathered = await asyncio.gather(*[_exec_one(tc) for tc in llm_response.tool_calls])
+        for tc_id, output, tool_call, result in gathered:
+            if result is not None:
+                tools_called.add(tool_call.name)
+                audit.log_allow("tool_gate", tool_call, reason=f"executed in {result.duration_ms}ms")
+                session_log.log_tool_result(str(message.session_id), tool_call.name, result.output, result.error, result.duration_ms)
+            messages.append(_tool_result_message(tc_id, output))
 
     # Exceeded max iterations — ask for a final response without tools
     if in_execution_mode:

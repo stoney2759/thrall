@@ -3,14 +3,14 @@ export type WsStatus = 'disconnected' | 'connecting' | 'ready' | 'typing';
 type InboundFrame =
   | { type: 'ready'; session_id: string }
   | { type: 'typing' }
-  | { type: 'response'; content: string; reasoning: string | null }
+  | { type: 'response'; content: string; reasoning: string | null; session_id?: string }
   | { type: 'sync'; role: 'user' | 'assistant'; content: string }
   | { type: 'pong' }
   | { type: 'error'; message: string };
 
 export interface WsCallbacks {
   onStatus: (s: WsStatus) => void;
-  onMessage: (content: string) => void;
+  onMessage: (content: string, sessionId: string | null) => void;
   onSync: (role: 'user' | 'assistant', content: string) => void;
   onError: (msg: string) => void;
   onSessionId: (id: string) => void;
@@ -18,7 +18,7 @@ export interface WsCallbacks {
 
 export interface WsClient {
   connect: () => void;
-  send: (content: string) => void;
+  send: (content: string, sessionId?: string) => void;
   disconnect: () => void;
 }
 
@@ -56,7 +56,7 @@ export function createWsClient(token: string, callbacks: WsCallbacks): WsClient 
       } else if (frame.type === 'typing') {
         callbacks.onStatus('typing');
       } else if (frame.type === 'response') {
-        callbacks.onMessage(frame.content);
+        callbacks.onMessage(frame.content, frame.session_id ?? null);
         callbacks.onStatus('ready');
       } else if (frame.type === 'sync') {
         callbacks.onSync(frame.role, frame.content);
@@ -80,9 +80,11 @@ export function createWsClient(token: string, callbacks: WsCallbacks): WsClient 
     };
   }
 
-  function send(content: string) {
+  function send(content: string, sessionId?: string) {
     if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'message', content }));
+      const payload: Record<string, string> = { type: 'message', content };
+      if (sessionId) payload.session_id = sessionId;
+      ws.send(JSON.stringify(payload));
     }
   }
 

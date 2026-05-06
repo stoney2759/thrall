@@ -12,14 +12,14 @@ import MemoryPanel from './components/MemoryPanel';
 import SessionsPanel from './components/SessionsPanel';
 
 export default function App() {
-  const { activePanel, setWsStatus, addMessage, setSessionId, wsStatus } = useStore();
+  const { activePanel, setWsStatus, addMessage, setSessionId, wsStatus, activeSessionId } = useStore();
   const wsRef = useRef<WsClient | null>(null);
 
   useEffect(() => {
     const token = (import.meta as unknown as { env: Record<string, string> }).env.VITE_THRALL_TOKEN ?? '';
     const client = createWsClient(token, {
       onStatus: setWsStatus,
-      onMessage: (content) => addMessage('assistant', content),
+      onMessage: (content, sessionId) => addMessage('assistant', content, sessionId),
       onSync: (role, content) => addMessage(role, content),
       onError: (msg) => addMessage('assistant', `[error] ${msg}`),
       onSessionId: setSessionId,
@@ -32,7 +32,7 @@ export default function App() {
 
   function sendMessage(content: string) {
     addMessage('user', content);
-    wsRef.current?.send(content);
+    wsRef.current?.send(content, activeSessionId);
   }
 
   return (
