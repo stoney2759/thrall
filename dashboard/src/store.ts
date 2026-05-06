@@ -48,7 +48,7 @@ interface Store {
   sessions: Session[];
   activeSessionId: string;
 
-  addMessage: (role: MsgRole, content: string) => void;
+  addMessage: (role: MsgRole, content: string, targetSessionId?: string | null) => void;
   setWsStatus: (s: WsStatus) => void;
   setSessionId: (id: string) => void;
   setPanel: (p: Panel) => void;
@@ -67,20 +67,22 @@ export const useStore = create<Store>((set) => ({
   sessions: _initSessions,
   activeSessionId: _initActiveId,
 
-  addMessage: (role, content) => {
+  addMessage: (role, content, targetSessionId) => {
     const msg: ChatMessage = { id: crypto.randomUUID(), role, content, ts: Date.now() };
     set((s) => {
+      const writeToId = targetSessionId ?? s.activeSessionId;
       const sessions = s.sessions.map((sess) => {
-        if (sess.id !== s.activeSessionId) return sess;
+        if (sess.id !== writeToId) return sess;
         const updated = { ...sess, messages: [...sess.messages, msg] };
-        // Auto-name from first user message
         if (role === 'user' && sess.messages.length === 0 && sess.name === 'New chat') {
           updated.name = content.slice(0, 28) + (content.length > 28 ? '…' : '');
         }
         return updated;
       });
       _saveSessions(sessions);
-      return { sessions, messages: [...s.messages, msg] };
+      // Only update visible messages if writing to the active session
+      const messages = writeToId === s.activeSessionId ? [...s.messages, msg] : s.messages;
+      return { sessions, messages };
     });
   },
 

@@ -71,13 +71,20 @@ async def handle(ws: WebSocket) -> None:
                 await _send(ws, {"type": "error", "message": "empty message"})
                 continue
 
+            # Use the client's tab session_id if provided, otherwise fall back to connection-level
+            raw_sid = frame.get("session_id")
+            try:
+                msg_session_id = uuid.UUID(raw_sid) if raw_sid else session_id
+            except (ValueError, AttributeError):
+                msg_session_id = session_id
+
             await _send(ws, {"type": "typing"})
 
             if content.startswith("/"):
-                response = await _dispatch_command(content, str(session_id))
+                response = await _dispatch_command(content, str(msg_session_id))
             else:
                 message = Message(
-                    session_id=session_id,
+                    session_id=msg_session_id,
                     role=Role.USER,
                     content=content,
                     transport=Transport.API,
@@ -98,7 +105,7 @@ async def handle(ws: WebSocket) -> None:
                 except Exception:
                     pass
 
-            await _send(ws, {"type": "response", "content": response, "reasoning": None})
+            await _send(ws, {"type": "response", "content": response, "reasoning": None, "session_id": str(msg_session_id)})
 
     except WebSocketDisconnect:
         pass
