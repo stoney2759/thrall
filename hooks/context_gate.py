@@ -28,9 +28,11 @@ def build_context(
     now = datetime.now().astimezone()
     user_block = _build_user_block()
     workspace = state.get_workspace_dir()
+    root_dir = str(Path(__file__).parent.parent)
     prefix = f"Current date and time: {now.strftime('%Y-%m-%d %H:%M:%S %Z')} (today is {now.strftime('%A, %d %B %Y')})"
+    prefix += f"\nThrall root: {root_dir} — logs/, config/, identity/, state/ live here"
     if workspace:
-        prefix += f"\nCurrent working directory: {workspace}"
+        prefix += f"\nWorkspace (default tool cwd for user projects): {workspace}"
     if user_block:
         prefix += f"\n\n{user_block}"
     system_content = prefix + "\n\n" + system_content

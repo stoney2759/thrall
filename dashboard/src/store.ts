@@ -43,6 +43,7 @@ const _initActiveId = _initSessions[0].id;
 interface Store {
   messages: ChatMessage[];
   wsStatus: WsStatus;
+  typingSessions: string[];
   sessionId: string | null;
   activePanel: Panel;
   sessions: Session[];
@@ -50,6 +51,7 @@ interface Store {
 
   addMessage: (role: MsgRole, content: string, targetSessionId?: string | null) => void;
   setWsStatus: (s: WsStatus) => void;
+  setTyping: (sessionId: string | null, isTyping: boolean) => void;
   setSessionId: (id: string) => void;
   setPanel: (p: Panel) => void;
   clearChat: () => void;
@@ -62,6 +64,7 @@ interface Store {
 export const useStore = create<Store>((set) => ({
   messages: _initSessions.find((s) => s.id === _initActiveId)?.messages ?? [],
   wsStatus: 'disconnected',
+  typingSessions: [],
   sessionId: null,
   activePanel: 'chat',
   sessions: _initSessions,
@@ -87,6 +90,11 @@ export const useStore = create<Store>((set) => ({
   },
 
   setWsStatus: (wsStatus) => set({ wsStatus }),
+  setTyping: (sessionId, isTyping) => set((s) => ({
+    typingSessions: isTyping
+      ? sessionId && !s.typingSessions.includes(sessionId) ? [...s.typingSessions, sessionId] : s.typingSessions
+      : sessionId ? s.typingSessions.filter((id) => id !== sessionId) : [],
+  })),
   setSessionId: (sessionId) => set({ sessionId }),
   setPanel: (activePanel) => set({ activePanel }),
 
