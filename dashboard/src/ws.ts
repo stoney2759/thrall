@@ -2,7 +2,7 @@ export type WsStatus = 'disconnected' | 'connecting' | 'ready' | 'typing';
 
 type InboundFrame =
   | { type: 'ready'; session_id: string }
-  | { type: 'typing' }
+  | { type: 'typing'; session_id?: string }
   | { type: 'response'; content: string; reasoning: string | null; session_id?: string }
   | { type: 'sync'; role: 'user' | 'assistant'; content: string }
   | { type: 'pong' }
@@ -10,6 +10,7 @@ type InboundFrame =
 
 export interface WsCallbacks {
   onStatus: (s: WsStatus) => void;
+  onTyping: (sessionId: string | null) => void;
   onMessage: (content: string, sessionId: string | null) => void;
   onSync: (role: 'user' | 'assistant', content: string) => void;
   onError: (msg: string) => void;
@@ -54,7 +55,7 @@ export function createWsClient(token: string, callbacks: WsCallbacks): WsClient 
           ws?.send(JSON.stringify({ type: 'ping' }));
         }, 25_000);
       } else if (frame.type === 'typing') {
-        callbacks.onStatus('typing');
+        callbacks.onTyping(frame.session_id ?? null);
       } else if (frame.type === 'response') {
         callbacks.onMessage(frame.content, frame.session_id ?? null);
         callbacks.onStatus('ready');

@@ -78,7 +78,7 @@ async def handle(ws: WebSocket) -> None:
             except (ValueError, AttributeError):
                 msg_session_id = session_id
 
-            await _send(ws, {"type": "typing"})
+            await _send(ws, {"type": "typing", "session_id": str(msg_session_id)})
 
             if content.startswith("/"):
                 response = await _dispatch_command(content, str(msg_session_id))

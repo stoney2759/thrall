@@ -491,7 +491,7 @@ export default function Chat({ onSend, typing }: Props) {
                   </div>
                 </div>
                 </div>
-                {elapsed > 0 && (
+                {typing && (
                   <span className="text-xs text-muted tabular-nums select-none">
                     {elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`}
                   </span>
