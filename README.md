@@ -246,6 +246,11 @@ Audit log: append-only, 50MB max, 7-day retention.
 | google-calendar | Disabled | Events and scheduling |
 | google-drive | Disabled | Files and documents |
 | brave-search | Disabled | Web search via Brave API |
+| youtube | Disabled | Video search, metadata, transcripts |
+| slack | Disabled | Team messaging, channels, search |
+| notion | Disabled | Docs, notes, and databases |
+| postgres | Disabled | Direct PostgreSQL database access |
+| sqlite | Disabled | Local SQLite database access |
 
 Enable any server in `config/config.toml` (`enabled = true`) and add credentials to `.env`.
 
