@@ -3,7 +3,7 @@ import os
 import httpx
 
 _URL = "https://openrouter.ai/api/v1/audio/transcriptions"
-_MODEL = "openai/whisper-large-v3"
+_MODEL = "openai/whisper-1"
 
 
 async def transcribe(audio_bytes: bytes, filename: str = "audio.ogg", language: str = "en") -> str:

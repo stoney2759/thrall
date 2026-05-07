@@ -20,6 +20,18 @@ state/
 logs/
 *.log
 
+# External agent catalog (sourced from third-party repos)
+components/agents/catalog/01-core-development/
+components/agents/catalog/02-language-specialists/
+components/agents/catalog/03-infrastructure/
+components/agents/catalog/04-quality-security/
+components/agents/catalog/05-data-ai/
+components/agents/catalog/06-developer-experience/
+components/agents/catalog/07-specialized-domains/
+components/agents/catalog/08-business-product/
+components/agents/catalog/09-meta-orchestration/
+components/agents/catalog/10-research-analysis/
+
 # Dev artifacts
 THRALL2_STATE.md
 thrall-map.xml
