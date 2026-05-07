@@ -20,6 +20,9 @@ state/
 logs/
 *.log
 
+# Identity backups
+identity/backup/
+
 # External agent catalog (sourced from third-party repos)
 components/agents/catalog/01-core-development/
 components/agents/catalog/02-language-specialists/
