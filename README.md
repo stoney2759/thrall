@@ -1,13 +1,14 @@
 # Thrall
 
-A permanent, stateful autonomous agent — built to run on Telegram and get real work done.
+A permanent, stateful autonomous agent with a desktop webapp, voice, vision, and real tool use.
 
-Thrall is not a chatbot wrapper. It's an executive layer with memory, tools, and judgment. It reasons, acts, spawns sub-agents, and remembers across sessions.
+Thrall is not a chatbot wrapper. It's an executive layer with memory, tools, and judgment. It reasons, acts, spawns sub-agents, and remembers across sessions. Run it from the desktop app, CLI, or Telegram — your choice.
 
 ---
 
 ## What It Does
 
+- **Desktop webapp** — React/Vite dashboard with concurrent isolated sessions, live over WebSocket
 - **Autonomous reasoning loop** — parallel tool execution, up to 100 iterations in approved mode
 - **55 native tools** — filesystem, web, browser automation, code execution, media, vision, memory, scheduling, clipboard, documents, notebooks, IDE diagnostics, and more
 - **14 core catalog agents** — named specialists Thrall delegates to automatically
@@ -15,25 +16,24 @@ Thrall is not a chatbot wrapper. It's an executive layer with memory, tools, and
 - **Four-layer persistent memory** — identity, session, episodic, and semantic
 - **Five-gate security model** — input sanitization, context control, tool permissions, output scrubbing, memory validation
 - **Scheduled jobs** — natural language cron and heartbeat intervals
-- **Multi-transport** — Telegram (primary), CLI, desktop webapp (multi-session WebSocket), Discord/Slack (wired, disabled by default)
 - **Voice I/O** — speech-to-text (Groq/OpenAI/OpenRouter) + text-to-speech (ElevenLabs/OpenAI) with cost gating and caching
 - **Vision** — image and video frame analysis via dedicated vision model
 - **Video pipeline** — download (yt-dlp), process (ffmpeg), transcribe, extract frames, analyse
 - **Browser automation** — full Playwright session with screenshot + vision description flow
-- **Desktop dashboard** — React/Vite webapp with concurrent isolated sessions
+- **Multi-transport** — desktop webapp, CLI, Telegram, Discord/Slack (wired, disabled by default)
 
 ---
 
 ## Stack
 
 - Python 3.12+
-- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
+- FastAPI + React/Vite — desktop webapp (primary interface)
 - [OpenRouter](https://openrouter.ai) — primary LLM provider (OpenAI, Anthropic, Google, DeepSeek, and more)
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
 - [Playwright](https://playwright.dev/python/) — browser automation
-- FastAPI + React/Vite — desktop dashboard
 - ElevenLabs / OpenAI — TTS
 - yt-dlp + ffmpeg — video pipeline
+- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) — Telegram transport (optional)
 
 ---
 
@@ -64,24 +64,28 @@ Edit `config/config.toml`:
 - Enable any MCP servers under `[[mcp.servers]]`
 
 Edit `.env`:
-- `TELEGRAM_BOT_TOKEN` — from [@BotFather](https://t.me/BotFather)
-- `OPENROUTER_API_KEY` — recommended primary LLM provider
+- `OPENROUTER_API_KEY` — required, primary LLM provider
+- `THRALL_DESKTOP_TOKEN` — secures the desktop WebSocket endpoint
 - `SERPER_API_KEY` or `BRAVE_API_KEY` — web search
 - `GROQ_API_KEY` — fast speech-to-text (free tier)
 - `ELEVENLABS_API_KEY` — text-to-speech
-- `THRALL_DESKTOP_TOKEN` — secures the desktop WebSocket endpoint
+- `TELEGRAM_BOT_TOKEN` — only needed if using Telegram transport
 
 ### 3. Run
 
 ```powershell
-# Windows — full stack (Telegram + API + Dashboard)
+# Windows — full stack (API + Dashboard + Telegram)
 .\start.ps1
 
-# Individual services
-.\start-telegram.ps1
+# Desktop webapp only (recommended starting point)
 .\start-api.ps1
 .\start-dashboard.ps1
+
+# Telegram only
+.\start-telegram.ps1
 ```
+
+Open `http://localhost:8000` to access the dashboard.
 
 ---
 
@@ -250,7 +254,7 @@ Enable any server in `config/config.toml` (`enabled = true`) and add credentials
 ## Architecture
 
 ```
-Telegram / CLI / Desktop WebSocket
+Desktop WebSocket / CLI / Telegram
          ↓
     coordinator.py  (agentic loop — parallel tool execution via asyncio)
          ↓
