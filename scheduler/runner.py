@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from scheduler.job import Job
 from scheduler import store
-from scheduler.cron_eval import is_due, to_cron_expr
+from scheduler.cron_eval import is_due, to_cron_expr, validate
 from bootstrap import state
 
 _bot = None
@@ -48,7 +48,12 @@ def _get_cron_expr(job: Job) -> str | None:
     """Resolve the cron expression for a job, falling back to legacy conversion."""
     if job.cron_expr:
         return job.cron_expr
-    return to_cron_expr(job.schedule)
+
+    schedule = (job.schedule or "").strip()
+    if validate(schedule):
+        return schedule
+
+    return to_cron_expr(schedule)
 
 
 def _should_fire(job: Job, now: datetime) -> bool:
