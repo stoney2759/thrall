@@ -1,5 +1,5 @@
 ﻿from __future__ import annotations
-import re
+import fnmatch
 import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
@@ -19,7 +19,6 @@ def execute(call: ToolCall) -> ToolResult:
     limit = call.args.get("limit", _MAX_RESULTS)
 
     try:
-        name_re = re.compile(name_pattern, re.IGNORECASE) if name_pattern else None
         results: list[str] = []
 
         for entry in root.rglob("*"):
@@ -30,7 +29,7 @@ def execute(call: ToolCall) -> ToolResult:
                     continue
                 if kind == "dir" and not entry.is_dir():
                     continue
-                if name_re and not name_re.search(entry.name):
+                if name_pattern and not fnmatch.fnmatch(entry.name.lower(), name_pattern.lower()):
                     continue
                 if extension and entry.suffix.lower() != extension.lower():
                     continue
@@ -50,8 +49,6 @@ def execute(call: ToolCall) -> ToolResult:
             output += f"\n... (limited to {limit} results)"
         return _result(call.id, output=output, start=start)
 
-    except re.error as e:
-        return _result(call.id, error=f"invalid name pattern: {e}", start=start)
     except Exception as e:
         return _result(call.id, error=str(e), start=start)
 
@@ -61,7 +58,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
 
 
 NAME = "filesystem_find"
-DESCRIPTION = "Find files and directories by name pattern, type, size, or extension."
+DESCRIPTION = "Find files and directories by glob name pattern (e.g. *.py, *akCrsyp0KME*), type, size, or extension."
 PARAMETERS = {
     "path": {"type": "string", "required": False, "default": "."},
     "name": {"type": "string", "required": False, "default": ""},
