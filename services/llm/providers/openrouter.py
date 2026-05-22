@@ -195,10 +195,16 @@ def _parse_llm_response(data: dict) -> LLMResponse:
 
     tool_calls: list[ToolCallRequest] = []
     for tc in message.get("tool_calls") or []:
+        raw_args = tc["function"].get("arguments", "{}")
+        try:
+            args = json.loads(raw_args)
+        except json.JSONDecodeError:
+            logger.warning("Malformed tool call arguments from model (tool=%s) — skipping: %r", tc["function"]["name"], raw_args[:120])
+            continue
         tool_calls.append(ToolCallRequest(
             id=tc["id"],
             name=tc["function"]["name"],
-            args=json.loads(tc["function"]["arguments"]),
+            args=args,
         ))
 
     content = message.get("content") or ""
