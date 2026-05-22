@@ -38,6 +38,27 @@ async def _get_fx_rate(target: str) -> float:
         return _fx_rate or 1.0
 
 _START_TIME = time.time()
+_mcp_manager = None
+
+
+async def _init_mcp() -> None:
+    global _mcp_manager
+    try:
+        from bootstrap import state
+        from services.mcp.manager import MCPClientManager
+        from services.mcp import executor as mcp_executor
+        from thrall.tools import registry as tools
+        mcp_config = state.get_config().get("mcp", {})
+        manager = MCPClientManager()
+        await manager.connect_all(mcp_config)
+        mcp_executor.set_manager(manager)
+        _mcp_manager = manager
+        mcp_tools = manager.all_tools()
+        if mcp_tools:
+            tools.register_mcp_tools(mcp_tools)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"MCP startup error: {e}")
 
 
 class CreateJobBody(BaseModel):
@@ -59,7 +80,10 @@ class StopTaskBody(BaseModel):
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     startup.start()
+    await _init_mcp()
     yield
+    if _mcp_manager:
+        await _mcp_manager.disconnect_all()
 
 
 app = FastAPI(title="Thrall", version="2.0.0", lifespan=_lifespan)
@@ -292,18 +316,8 @@ async def api_stop_task(body: StopTaskBody):
 
 @app.get("/api/agents")
 async def api_agents():
-    from thrall.tasks.pool import list_active
-    tasks = list_active()
-    return JSONResponse([
-        {
-            "id": str(t.id),
-            "profile": t.profile.name,
-            "status": t.status.value,
-            "brief": t.brief,
-            "created_at": t.created_at.isoformat(),
-        }
-        for t in tasks
-    ])
+    from thrall.tasks.task_disk import read_all
+    return JSONResponse(read_all())
 
 
 @app.delete("/api/agents/{task_id}")
