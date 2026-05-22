@@ -25,6 +25,14 @@ class LocalTask(BaseTask):
             "status": TaskStatus.RUNNING,
             "started_at": datetime.now(timezone.utc),
         })
+        from thrall.tasks.task_disk import write as _disk_write
+        _disk_write(
+            task_id=str(self.task.id),
+            profile=self.task.profile.name,
+            status=self.task.status.value,
+            brief=self.task.brief,
+            created_at=self.task.created_at.isoformat(),
+        )
 
         try:
             result = await self._reason()

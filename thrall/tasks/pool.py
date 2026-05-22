@@ -5,6 +5,7 @@ from uuid import UUID
 from schemas.task import Task, TaskType, TaskStatus
 from interfaces.task import BaseTask
 from bootstrap import state
+from thrall.tasks.task_disk import write as _disk_write
 
 # Active task pool — single source of truth for all running workers.
 # Tasks are asyncio.Task wrappers around BaseTask instances.
@@ -23,6 +24,13 @@ async def submit(task: Task) -> BaseTask:
     loop_task = asyncio.create_task(_run(worker), name=f"task-{task.id}")
     _pool[task.id] = (worker, loop_task)
     state.increment_tasks()
+    _disk_write(
+        task_id=str(task.id),
+        profile=task.profile.name,
+        status=task.status.value,
+        brief=task.brief,
+        created_at=task.created_at.isoformat(),
+    )
     return worker
 
 
@@ -62,6 +70,15 @@ async def _run(worker: BaseTask) -> None:
     try:
         await worker.run()
     finally:
+        t = worker.task
+        _disk_write(
+            task_id=str(t.id),
+            profile=t.profile.name,
+            status=t.status.value,
+            brief=t.brief,
+            created_at=t.created_at.isoformat(),
+            completed_at=t.completed_at.isoformat() if t.completed_at else None,
+        )
         _pool.pop(worker.id, None)
         for cb in _completion_callbacks:
             try:
