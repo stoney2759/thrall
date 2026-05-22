@@ -22,6 +22,15 @@ interface CommandEntry {
 
 const IMG_BLOCK = /\[Image: ([^\]]+)\]\n(data:image\/[^\s]+)/g;
 
+function isImageUrl(url: string): boolean {
+  try {
+    const ext = new URL(url).pathname.split('.').pop()?.toLowerCase() ?? '';
+    return ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext);
+  } catch {
+    return false;
+  }
+}
+
 const USER_MD_COMPONENTS = {
   p: ({ children }: { children?: React.ReactNode }) => (
     <p className="mb-1 last:mb-0">{children}</p>
@@ -230,6 +239,29 @@ export default function Chat({ onSend, typing }: Props) {
         );
       }
       return <p>{children}</p>;
+    },
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+      if (href && isImageUrl(href)) {
+        return (
+          <div className="my-3">
+            <img
+              src={href}
+              alt={typeof children === 'string' ? children : 'Generated image'}
+              className="max-w-full rounded-xl border border-border"
+              style={{ maxHeight: '480px', objectFit: 'contain' }}
+            />
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted hover:text-primary mt-1 block"
+            >
+              Open full size ↗
+            </a>
+          </div>
+        );
+      }
+      return <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{children}</a>;
     },
     table: ({ children }: { children?: React.ReactNode }) => (
       <div className="overflow-x-auto my-2">
