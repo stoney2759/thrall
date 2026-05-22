@@ -15,7 +15,7 @@ from thrall import context
 from thrall.tools import registry as tools
 from hooks import input_gate, output_gate, tool_gate, audit, session_log
 from bootstrap import state
-from constants.coordinator import MAX_TOOL_ITERATIONS, AUTO_COMPACT_COOLDOWN_SECONDS
+from constants.coordinator import MAX_TOOL_ITERATIONS, AUTO_COMPACT_COOLDOWN_SECONDS, MAX_TOOL_RESULT_IN_CONTEXT
 
 logger = logging.getLogger(__name__)  # 5 minutes
 
@@ -324,6 +324,8 @@ async def _reason(
                 tools_called.add(tool_call.name)
                 audit.log_allow("tool_gate", tool_call, reason=f"executed in {result.duration_ms}ms")
                 session_log.log_tool_result(str(message.session_id), tool_call.name, result.output, result.error, result.duration_ms)
+            if len(output) > MAX_TOOL_RESULT_IN_CONTEXT:
+                output = output[:MAX_TOOL_RESULT_IN_CONTEXT] + f"\n\n[truncated — {len(output):,} chars total]"
             messages.append(_tool_result_message(tc_id, output))
 
     # Exceeded max iterations — ask for a final response without tools

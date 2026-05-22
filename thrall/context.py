@@ -5,6 +5,7 @@ from schemas.message import Message, Role
 from services import session_memory
 from services.memory.router import get_store
 from hooks import context_gate
+from constants.memory import EPISODE_QUERY_LENGTH, MAX_EPISODES, MAX_FACTS
 
 _IDENTITY_DIR = Path(__file__).parent.parent / "identity"
 
@@ -18,9 +19,9 @@ async def assemble(message: Message) -> list[dict]:
 
     # Pull relevant memory from store
     store = await get_store()
-    query = message.content[:200]
-    episodes = await store.search_episodes(query, limit=20)
-    facts = await store.search_facts(query, limit=10)
+    query = message.content[:EPISODE_QUERY_LENGTH]
+    episodes = await store.search_episodes(query, limit=MAX_EPISODES)
+    facts = await store.search_facts(query, limit=MAX_FACTS)
 
     return context_gate.build_context(
         session_context=session_ctx,

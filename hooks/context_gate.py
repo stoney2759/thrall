@@ -6,7 +6,7 @@ from pathlib import Path
 from schemas.memory import Episode, KnowledgeFact
 from bootstrap import state
 from hooks import audit
-from constants.memory import MAX_EPISODES, MAX_FACTS
+from constants.memory import MAX_EPISODES, MAX_FACTS, MAX_EPISODE_DISPLAY_CHARS
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +60,13 @@ def build_context(
     # Relevant episodic memory
     if episodes:
         capped = episodes[:MAX_EPISODES]
-        episode_block = "\n".join(
-            f"[{e.timestamp.strftime('%Y-%m-%d %H:%M')}] {e.role}: {e.content}"
-            for e in capped
-        )
+        display_limit = state.get_config().get("memory", {}).get("episode_display_chars", MAX_EPISODE_DISPLAY_CHARS)
+        def _fmt_episode(e: Episode) -> str:
+            content = e.content
+            if display_limit and len(content) > display_limit:
+                content = content[:display_limit] + "..."
+            return f"[{e.timestamp.strftime('%Y-%m-%d %H:%M')}] {e.role}: {content}"
+        episode_block = "\n".join(_fmt_episode(e) for e in capped)
         messages.append({
             "role": "system",
             "content": f"## Relevant past context\n{episode_block}",
