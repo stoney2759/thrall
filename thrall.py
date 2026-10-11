@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 
 from constants.launcher import (  # noqa: E402 — needs ROOT on sys.path
     MODE_ALL, MODE_WEB, MODE_TELEGRAM, MODE_CLI, LAUNCH_MENU, LAUNCH_DEFAULT_KEY, LAUNCH_LOG_NAMES,
-    DEFAULT_HOST, DEFAULT_PORT, DASHBOARD_DIR, DASHBOARD_BUILT_FILE, DASHBOARD_SOURCE_DIRS,
+    DEFAULT_HOST, DEFAULT_PORT, DASHBOARD_DIR, DASHBOARD_BUILT_FILE, DASHBOARD_DEPS_DIR, DASHBOARD_SOURCE_DIRS,
     DASHBOARD_SOURCE_FILES, BANNER, TAGLINE, COLOURS, CONFIG_PATH, CONFIG_MISSING_MSG, CONFIG_INVALID_MSG,
     CONFIG_INVALID_HINT, TELEGRAM_NO_USERS_MSG,
 )
@@ -102,8 +102,8 @@ def load_config() -> dict:
         log(CONFIG_MISSING_MSG, "red")
         sys.exit(1)
     try:
-        with open(path, "rb") as f:
-            return tomllib.load(f)
+        # utf-8-sig: some Windows editors save a BOM, which plain TOML parsing rejects at line 1
+        return tomllib.loads(path.read_text(encoding="utf-8-sig"))
     except tomllib.TOMLDecodeError as e:
         log(CONFIG_INVALID_MSG.format(error=e), "red")
         log(CONFIG_INVALID_HINT, "yellow")
@@ -135,16 +135,20 @@ def dashboard_needs_build() -> bool:
 
 def build_dashboard() -> bool:
     npm = "npm.cmd" if sys.platform == "win32" else "npm"
-    log("Building the webapp (npm run build)…")
-    try:
-        result = subprocess.run([npm, "run", "build"], cwd=ROOT / DASHBOARD_DIR, capture_output=True, text=True)
-    except FileNotFoundError:
-        log("npm not found — install Node.js to build the webapp.", "red")
-        return False
-    if result.returncode != 0:
-        log("Webapp build failed:", "red")
-        print(result.stdout[-2000:] + result.stderr[-2000:])
-        return False
+    steps = [("npm run build", [npm, "run", "build"])]
+    if not (ROOT / DASHBOARD_DEPS_DIR).is_dir():  # fresh clone — the build tools aren't installed yet
+        steps.insert(0, ("npm install — first run only, takes a minute", [npm, "install"]))
+    for label, command in steps:
+        log(f"Webapp: {label}…")
+        try:
+            result = subprocess.run(command, cwd=ROOT / DASHBOARD_DIR, capture_output=True, text=True)
+        except FileNotFoundError:
+            log("npm not found — install Node.js to build the webapp.", "red")
+            return False
+        if result.returncode != 0:
+            log(f"Webapp {label.split(' —')[0]} failed:", "red")
+            print(result.stdout[-2000:] + result.stderr[-2000:])
+            return False
     log("Webapp built.", "green")
     return True
 

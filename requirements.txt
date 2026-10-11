@@ -15,17 +15,18 @@ openai
 anthropic
 google-generativeai
 
-# Async
-asyncio
+# MCP servers (client)
+mcp
 
 # Memory backends
-redis[asyncio]
+redis
 qdrant-client
 
 # Utilities
 python-dotenv
-tomli
-pywin32
+pyyaml
+openpyxl
+pywin32; sys_platform == "win32"
 pyperclip
 psutil
 pdfplumber

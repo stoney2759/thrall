@@ -46,6 +46,12 @@ class TestLoadConfig:
             launcher.load_config()
         assert "can't read" in capsys.readouterr().out
 
+    def test_config_saved_with_bom_still_loads(self, tmp_path, monkeypatch):
+        (tmp_path / "config").mkdir()
+        (tmp_path / "config" / "config.toml").write_bytes(b"\xef\xbb\xbf[server]\nport = 8765\n")
+        monkeypatch.setattr(launcher, "ROOT", tmp_path)
+        assert launcher.load_config() == {"server": {"port": 8765}}
+
     def test_missing_config_exits_with_message(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setattr(launcher, "ROOT", tmp_path)
         with pytest.raises(SystemExit):

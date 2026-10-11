@@ -27,6 +27,7 @@ Thrall is not a chatbot wrapper. It's an executive layer with memory, tools, and
 ## Stack
 
 - Python 3.12+
+- Node.js 18+ — builds the webapp (the first run installs its packages automatically)
 - FastAPI + React/Vite — desktop webapp (primary interface)
 - [OpenRouter](https://openrouter.ai) — primary LLM provider (OpenAI, Anthropic, Google, DeepSeek, and more)
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)

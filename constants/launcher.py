@@ -23,6 +23,7 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
 DASHBOARD_DIR = "dashboard"
 DASHBOARD_BUILT_FILE = "dashboard/dist/index.html"
+DASHBOARD_DEPS_DIR = "dashboard/node_modules"   # missing on a fresh clone → npm install first
 DASHBOARD_SOURCE_DIRS = ("dashboard/src",)
 DASHBOARD_SOURCE_FILES = ("dashboard/index.html", "dashboard/package.json", "dashboard/vite.config.ts",
                           "dashboard/tailwind.config.js")

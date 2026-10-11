@@ -117,8 +117,7 @@ def _load_config() -> dict:
     if not config_path.exists():
         raise RuntimeError(f"Config file not found: {config_path} — cannot start Thrall.")
     try:
-        with open(config_path, "rb") as f:
-            return tomllib.load(f)
+        return tomllib.loads(config_path.read_text(encoding="utf-8-sig"))  # tolerate a Windows BOM
     except tomllib.TOMLDecodeError as e:
         raise RuntimeError(f"Config file is invalid TOML: {e}") from e
 
