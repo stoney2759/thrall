@@ -2,7 +2,6 @@ from __future__ import annotations
 import asyncio
 import sys
 import uuid
-from datetime import datetime, timezone
 
 from schemas.message import Message, Role, Transport
 from bootstrap import state
@@ -21,18 +20,6 @@ def _build_message(content: str) -> Message:
     )
 
 
-def _print_status() -> None:
-    cfg = state.get_config()
-    uptime = datetime.now(timezone.utc) - datetime.fromisoformat(
-        cfg.get("thrall", {}).get("started_at", datetime.now(timezone.utc).isoformat())
-    )
-    print(f"  Active tasks : {state.get_active_task_count()}")
-    print(f"  Total cost   : ${state.get_total_cost():.4f}")
-    print(f"  Provider     : {cfg.get('llm', {}).get('provider', 'unknown')}")
-    print(f"  Model        : {state.get_model_override() or cfg.get('llm', {}).get('model', 'unknown')}")
-    print(f"  Session      : {_CLI_SESSION_ID}")
-
-
 def _handle_command(line: str) -> bool:
     """Returns True if the line was a command (consumed), False if it should be forwarded to Thrall."""
     parts = line.strip().split()
@@ -42,82 +29,49 @@ def _handle_command(line: str) -> bool:
         print("Goodbye.")
         sys.exit(0)
 
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    ctx = CommandContext(
+        user_id=_CLI_USER_ID,
+        session_id=_CLI_SESSION_ID,
+        transport=Transport.CLI,
+        args=parts[1:] if len(parts) > 1 else [],
+    )
+    result = asyncio.get_event_loop().run_until_complete(dispatch(cmd, ctx))
+    if result is None:
+        return False
+
+    print(result)
     if cmd == "/help":
-        from commands.base import CommandContext
-        from commands.registry import dispatch
-        from schemas.message import Transport
-        ctx = CommandContext(user_id=_CLI_USER_ID, session_id=_CLI_SESSION_ID, transport=Transport.CLI, args=[])
-        result = asyncio.get_event_loop().run_until_complete(dispatch("help", ctx))
-        print(result or "No commands found.")
         print("  /exit, /quit, /q   — exit")
-        return True
-
-    if cmd == "/status":
-        _print_status()
-        return True
-
-    if cmd == "/clear":
-        from services import session_memory
-        session_memory.clear(_CLI_SESSION_ID)
-        print("Session memory cleared.")
-        return True
-
-    if cmd == "/model":
-        if len(parts) < 2:
-            current = state.get_model_override() or state.get_config().get("llm", {}).get("model", "unknown")
-            print(f"Current model: {current}")
-        else:
-            state.set_model_override(parts[1])
-            print(f"Model switched to: {parts[1]}")
-        return True
-
-    if cmd == "/memory":
-        from commands.base import CommandContext
-        from commands.registry import dispatch
-        from schemas.message import Transport
-        args = parts[1:] if len(parts) > 1 else []
-        ctx = CommandContext(user_id=_CLI_USER_ID, session_id=_CLI_SESSION_ID, transport=Transport.CLI, args=args)
-        result = asyncio.get_event_loop().run_until_complete(dispatch("memory", ctx))
-        print(result or "No memory data.")
-        return True
-
-    if cmd == "/heartbeat":
-        from commands.base import CommandContext
-        from commands.registry import dispatch
-        from schemas.message import Transport
-        args = parts[1:] if len(parts) > 1 else []
-        ctx = CommandContext(user_id=_CLI_USER_ID, session_id=_CLI_SESSION_ID, transport=Transport.CLI, args=args)
-        result = asyncio.get_event_loop().run_until_complete(dispatch("heartbeat", ctx))
-        print(result or "Done.")
-        return True
-
-    if cmd == "/cron":
-        from commands.base import CommandContext
-        from commands.registry import dispatch
-        from schemas.message import Transport
-        args = parts[1:] if len(parts) > 1 else []
-        ctx = CommandContext(user_id=_CLI_USER_ID, session_id=_CLI_SESSION_ID, transport=Transport.CLI, args=args)
-        result = asyncio.get_event_loop().run_until_complete(dispatch("cron", ctx))
-        print(result or "Done.")
-        return True
-
-    if cmd == "/profile":
-        from commands.base import CommandContext
-        from commands.registry import dispatch
-        from schemas.message import Transport
-        args = parts[1:] if len(parts) > 1 else []
-        ctx = CommandContext(user_id=_CLI_USER_ID, session_id=_CLI_SESSION_ID, transport=Transport.CLI, args=args)
-        result = asyncio.get_event_loop().run_until_complete(dispatch("profile", ctx))
-        print(result or "Done.")
-        return True
-
-    return False
+    return True
 
 
 async def _loop() -> None:
     from thrall.coordinator import receive
+    from services import ask_user_channel, progress
 
     print("Thrall CLI — type /help for commands, /exit to quit.\n")
+    running: asyncio.Task | None = None
+
+    async def show(text: str) -> None:
+        print(f"\n{text}\n")
+
+    async def show_step(text: str) -> None:
+        print(f"  · {text}")
+
+    async def run(message) -> None:
+        # Tasks run in the background so the prompt stays live for permission
+        # answers and mid-task messages (the coordinator queues those).
+        progress.register(message.session_id, show_step)
+        try:
+            response = await receive(message)
+            print(f"\n{response}\n")
+        except Exception as e:
+            state.log_error(f"CLI handler error: {e}")
+            print(f"Error: {e}\n")
+        finally:
+            progress.unregister(message.session_id, show_step)
 
     while True:
         try:
@@ -130,17 +84,21 @@ async def _loop() -> None:
         if not line:
             continue
 
+        message = _build_message(line)
+        ask_user_channel.register_sender(message.session_id, show)
+        # An answer to a pending question (e.g. a permission prompt) goes to the waiting tool
+        if ask_user_channel.has_pending(message.session_id):
+            ask_user_channel.deliver_reply(message.session_id, line)
+            continue
+
         if line.startswith("/"):
             if _handle_command(line):
                 continue
 
-        message = _build_message(line)
-        try:
-            response = await receive(message)
-            print(f"\n{response}\n")
-        except Exception as e:
-            state.log_error(f"CLI handler error: {e}")
-            print(f"Error: {e}\n")
+        if running is not None and not running.done():
+            print(f"  {await receive(message)}")  # queued into the running task
+            continue
+        running = asyncio.create_task(run(message))
 
 
 def run() -> None:

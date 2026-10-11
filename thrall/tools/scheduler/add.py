@@ -58,7 +58,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
 
 
 NAME = "scheduler_add"
-DESCRIPTION = "Add a scheduled job. Use type='heartbeat' for recurring (schedule='30m'/'2h'/'1d') or type='cron' for daily at a time (schedule='18:00'). Optionally specify an agent from the catalog."
+DESCRIPTION = "Add a scheduled job. Use type='heartbeat' for recurring (schedule='30m'/'2h'/'1d') or type='cron' for daily at a time (schedule='18:00'). Optionally specify a built-in or catalog agent."
 PARAMETERS = {
     "schedule": {"type": "string", "required": True},
     "task": {"type": "string", "required": True},

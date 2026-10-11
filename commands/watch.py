@@ -1,6 +1,6 @@
 from __future__ import annotations
 from commands.base import Command, CommandContext
-from schemas.message import Message, Role
+from schemas.task import CapabilityProfile, Task, TaskType
 
 
 class WatchCommand(Command):
@@ -8,36 +8,56 @@ class WatchCommand(Command):
         return "watch"
 
     def description(self) -> str:
-        return "Process a video URL — download, transcribe, extract frames, describe visually, store in memory"
+        return "Start background video processing for a URL"
 
     async def execute(self, ctx: CommandContext) -> str:
-        from thrall.coordinator import receive
-        from bootstrap import state
-        from services import session_memory
-
-        url = (ctx.args or "").strip()
+        url = _args_text(ctx.args).strip()
         if not url:
             return "Usage: /watch <video_url>\nExample: /watch https://www.youtube.com/watch?v=..."
 
         if not (url.startswith("http://") or url.startswith("https://")):
             return f"That doesn't look like a URL: {url!r}\nUsage: /watch <video_url>"
 
-        session_key = str(ctx.session_id)
-        if state.has_active_task(session_key):
-            return "A task is already running. Send /stop to cancel it first."
+        from components.agents.utils import load_agent
+        from thrall.tasks import pool
+        from schemas.task import TaskStatus
 
-        # Raise iteration cap — video processing is a long multi-step pipeline
-        session_memory.set_execution_mode(ctx.session_id)
+        profile_name = "video-processor"
+        active = [
+            task for task in pool.list_active()
+            if task.profile.name == profile_name and task.status in (TaskStatus.PENDING, TaskStatus.RUNNING)
+        ]
+        if active:
+            return (
+                f"`{profile_name}` is already running as task {active[0].id}.\n"
+                "Use `/tasks` to check progress or `/stop <task_id>` to cancel it."
+            )
 
-        message = Message(
+        agent = load_agent(profile_name)
+        if agent is None:
+            return "The `video-processor` built-in agent is not available."
+
+        task = Task(
+            type=TaskType.LOCAL,
+            brief=f"Process this video URL fully and return the final report exactly as requested by your profile: {url}",
+            profile=CapabilityProfile(name=profile_name, allowed_tools=agent.allowed_tools),
+            soul_override=agent.soul,
+            silent=False,
             session_id=ctx.session_id,
-            role=Role.USER,
-            content=(
-                f"Process this video using the video-processor agent: {url}\n"
-                "Spawn the agent with profile=video-processor and wait for it to complete. "
-                "When it finishes, relay its output to the user exactly as-is — do not summarise, reformat, or add anything. The agent's report is the final response."
-            ),
-            transport=ctx.transport,
-            user_id=ctx.user_id,
         )
-        return await receive(message)
+        await pool.submit(task)
+
+        return (
+            f"Video processing started in the background.\n"
+            f"Task: {task.id}\n"
+            "Thrall is free for new instructions while it runs. Use `/tasks` to check progress "
+            f"or `/stop {task.id}` to cancel it."
+        )
+
+
+def _args_text(args: object) -> str:
+    if isinstance(args, str):
+        return args
+    if isinstance(args, list):
+        return " ".join(str(arg) for arg in args)
+    return ""

@@ -16,7 +16,7 @@ profile: default
 
 ### User
 
-name: unknown — ask once if relevant, then remember. GitHub username is stoney2759.
+name: unknown — ask once if relevant, then remember.
 address_as: first name when known. Nothing when not — never "user", never generic titles.
 
 ### Tone

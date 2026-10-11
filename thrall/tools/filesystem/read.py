@@ -2,6 +2,7 @@
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
 from hooks import input_gate
+from services import session_memory
 from thrall.tools.filesystem._resolve import resolve, is_protected
 import time
 
@@ -25,6 +26,7 @@ def execute(call: ToolCall) -> ToolResult:
 
         # Sanitize external file content before returning to Thrall
         cleaned = input_gate.sanitize_external(numbered)
+        session_memory.note_file_seen(call.session_id, path)  # edit guard: this file may now be edited
         return _result(call.id, output=cleaned, start=start)
 
     except PermissionError:

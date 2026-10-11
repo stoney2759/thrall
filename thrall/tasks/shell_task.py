@@ -3,7 +3,6 @@ import asyncio
 from datetime import datetime, timezone
 from schemas.task import Task, TaskStatus
 from interfaces.task import BaseTask
-from bootstrap import state
 
 
 class ShellTask(BaseTask):
@@ -33,10 +32,9 @@ class ShellTask(BaseTask):
             self.task.status = TaskStatus.FAILED
             self.task.error = str(e)
             self.task.completed_at = datetime.now(timezone.utc)
+            from bootstrap import state
             state.log_error(f"ShellTask {self.task.id} failed: {e}")
             return f"error: {e}"
-        finally:
-            state.decrement_tasks()
 
     async def _execute(self) -> str:
         timeout = self.task.profile.max_duration_seconds
@@ -75,4 +73,3 @@ class ShellTask(BaseTask):
         await self._kill()
         self.task.status = TaskStatus.CANCELLED
         self.task.completed_at = datetime.now(timezone.utc)
-        state.decrement_tasks()

@@ -114,5 +114,8 @@ class RedisBackend(MemoryBackend):
     async def search_facts(self, query: str, limit: int) -> list[KnowledgeFact]:
         return []
 
+    async def list_facts(self, limit: int) -> list[KnowledgeFact]:
+        return []
+
     async def delete_fact(self, fact_id: UUID) -> None:
         pass

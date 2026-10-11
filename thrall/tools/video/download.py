@@ -9,6 +9,7 @@ from uuid import UUID
 from bootstrap import state
 from schemas.tool import ToolCall, ToolResult
 from constants.tools import MAX_OUTPUT
+from constants.video import CONFIG_COOKIES_FILE, CONFIG_COOKIES_FROM_BROWSER, CONFIG_SECTION
 
 _DEFAULT_TIMEOUT = 600  # 10 minutes default for video operations
 
@@ -64,7 +65,15 @@ async def execute(call: ToolCall) -> ToolResult:
         args.extend(["--no-warnings", "--newline", url])
     else:
         return _result(call.id, error=f"unknown operation: {operation}", start=start)
-    
+
+    video_cfg = state.get_config().get(CONFIG_SECTION, {})
+    cookies_from_browser = video_cfg.get(CONFIG_COOKIES_FROM_BROWSER)
+    cookies_file = video_cfg.get(CONFIG_COOKIES_FILE)
+    if cookies_from_browser:
+        args = ["--cookies-from-browser", cookies_from_browser] + args
+    elif cookies_file and os.path.isfile(cookies_file):
+        args = ["--cookies", cookies_file] + args
+
     # Prepare environment — use system PATH as-is so the yt-dlp binary
     # resolves from wherever it is actually installed, not from sys.executable's
     # Scripts directory (which may be the wrong venv).

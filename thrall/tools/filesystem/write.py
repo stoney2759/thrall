@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
+from services import session_memory
 from thrall.tools.filesystem._resolve import resolve, is_protected
 from constants.tools import CODE_EXTS
 import time
@@ -16,6 +17,7 @@ def execute(call: ToolCall) -> ToolResult:
             return _result(call.id, error=f"path not found: {path}", start=start)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+        session_memory.note_file_seen(call.session_id, path)  # Thrall knows what it just wrote
         msg = f"written: {path}\n[Verify with filesystem_ls before reporting completion."
         if path.suffix in CODE_EXTS:
             msg += " This is a code file — re-read it and check for: string interpolation in shell/subprocess calls, hardcoded paths, argument escaping, and logic errors before reporting done."

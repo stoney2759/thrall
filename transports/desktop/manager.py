@@ -25,9 +25,9 @@ async def sync_message(role: str, content: str) -> None:
 
 async def _send_all(frame: str) -> None:
     dead: set[WebSocket] = set()
-    for ws in _connections:
+    for ws in list(_connections):  # copy — a socket can connect/drop while we await a send
         try:
             await ws.send_text(frame)
         except Exception:
             dead.add(ws)
-    _connections -= dead
+    _connections.difference_update(dead)

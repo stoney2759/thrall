@@ -43,8 +43,10 @@ class JsonlBackend(MemoryBackend):
 
     async def search_episodes(self, query: str, limit: int) -> list[Episode]:
         episodes = self._load_episodes()
-        q = query.lower()
-        matches = [e for e in episodes if q in e.content.lower()]
+        keywords = self._query_keywords(query)
+        if not keywords:
+            return episodes[-limit:]
+        matches = [e for e in episodes if any(kw in e.content.lower() for kw in keywords)]
         return matches[-limit:]
 
     def _load_episodes(self) -> list[Episode]:
@@ -70,9 +72,14 @@ class JsonlBackend(MemoryBackend):
 
     async def search_facts(self, query: str, limit: int) -> list[KnowledgeFact]:
         facts = self._load_facts()
-        q = query.lower()
-        matches = [f for f in facts if q in f.content.lower()]
+        keywords = self._query_keywords(query)
+        if not keywords:
+            return facts[-limit:]
+        matches = [f for f in facts if any(kw in f.content.lower() for kw in keywords)]
         return matches[-limit:]
+
+    async def list_facts(self, limit: int) -> list[KnowledgeFact]:
+        return self._load_facts()[-limit:]
 
     async def delete_fact(self, fact_id: UUID) -> None:
         facts = self._load_facts()

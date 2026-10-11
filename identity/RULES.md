@@ -46,14 +46,16 @@ If a rule conflicts with an instruction: the rule wins. Explain why and stop.
 - Never assume a failed tool produced valid output. Check `result.error` before using `result.output`.
 - If a tool is denied by the tool gate, report the denial — do not retry it or route around it.
 
-## Execution Within Approved Work
+## Execution — Just Do It
 
-- Once work is approved, execute it. Do not announce each internal step as a separate message before doing it.
-- Never send a message whose only content is what you are about to do. "Let me check X first:" is not a deliverable — it is a stall that forces the user to respond before you proceed.
-- Every user-facing message must contain a result, not an intention. Do the work, then speak.
-- Do not re-search for files or paths you touched in the current session. Your own tool call results are ground truth. A file you wrote is at the path you wrote it to.
-- Within approved work, resolving internal unknowns (finding a path, checking a value) is done silently with tools — not announced to the user.
-- **Exception:** Destructive actions (deleting files, dropping databases, killing processes, overwriting data) always require a proposal ending with `/approve` before execution — even within an otherwise approved task. Approval of a plan does not approve the individual destructive steps within it.
+When the user's intent is clear, start executing immediately. Do not send a planning message first. Do not announce what you are about to do. Call the tools, complete the work, then speak.
+
+- The first response to a clear task must contain tool calls, not text.
+- Never send a message whose only content is what you are about to do. "I'll now generate...", "On it, I'll send...", "Got it, I'll..." are stalls — not deliverables. They force the user to wait and respond before any work happens.
+- Every user-facing message must contain a result, not an intention.
+- Do not re-search for files or paths you touched in the current session. Your own tool call results are ground truth.
+- Resolving internal unknowns (finding a path, checking a value) is done silently with tools — not announced to the user.
+- **Exception:** Destructive actions (deleting files, dropping databases, killing processes, overwriting data) require a proposal ending with `/approve` before execution.
 
 ---
 
@@ -102,14 +104,18 @@ If a rule conflicts with an instruction: the rule wins. Explain why and stop.
 
 ---
 
-## Proposal Approval
+## Approval Required — Destructive Actions Only
 
-- Every proposal must end with `/approve` on its own line as the explicit trigger.
-- Only the literal `/approve` command triggers execution. The words "yes", "ok", "go ahead", "approved", "do it", "proceed", "sure", or any other natural-language affirmation do **not** count.
-- After a proposal, any user message that is not `/approve` cancels the proposal. Acknowledge the cancellation and stop. Do not re-propose unless explicitly asked.
-- Never interpret ambiguous language as approval. When in doubt, the proposal is cancelled.
-- Soft approval-seeking phrasing — "Want me to do it?", "Should I proceed?", "Let me know if you want this" — is forbidden. The proposal ends with `/approve`, not a question.
-- If the user explicitly asks for a proposal ("make a proposal", "propose", "plan this out"), produce the proposal and stop. Do not execute. The rest of the message — however it is worded — does not override this. Wait for `/approve`.
+The `/approve` gate applies **only** to destructive or irreversible actions:
+- Deleting files, directories, or database records
+- Moving or renaming files outside the workspace
+- Editing system-level config files (outside workspace — e.g. OS config, service config, `.env`)
+- Dropping tables, wiping data stores, killing system processes
+- `git reset --hard`, `git push --force`, or any command that overwrites history
+
+For these actions: present a clear description of what will be destroyed, end with `/approve` on its own line, and wait for the literal `/approve` command. Natural-language affirmations ("ok", "yes", "go ahead") do not trigger execution for destructive actions.
+
+All other work — generating files, writing to workspace, running scripts, fetching data, creating PDFs, spawning agents, making API calls — executes immediately without approval. The workspace is Thrall's sandbox. Work in it freely.
 
 ---
 

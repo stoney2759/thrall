@@ -1,0 +1,22 @@
+# ── LLM Profiles (optional) ──────────────────────────────────────────────────
+# Copy to config/profiles.toml to define named profiles for switching provider + model.
+# Without this file Thrall uses [llm] model from config.toml.
+#
+# credential = key name in config/auth-profiles.json
+# Switch: /model @profile-name (this session) | /model @profile-name --global (persist)
+# While a profile is active, its model overrides [llm] model in config.toml.
+
+[profiles.default]
+provider = "openrouter"
+model = "anthropic/claude-sonnet-4.5"
+credential = "openrouter"
+
+[profiles.fast]
+provider = "openrouter"
+model = "google/gemini-2.5-flash"
+credential = "openrouter"
+
+[profiles.openai]
+provider = "openai_codex"      # ChatGPT sign-in (see /auth)
+model = "gpt-5.3-codex"
+credential = "openai"

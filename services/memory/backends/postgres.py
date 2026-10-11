@@ -49,5 +49,8 @@ class PostgresBackend(MemoryBackend):
     async def search_facts(self, query: str, limit: int) -> list[KnowledgeFact]:
         raise NotImplementedError
 
+    async def list_facts(self, limit: int) -> list[KnowledgeFact]:
+        raise NotImplementedError
+
     async def delete_fact(self, fact_id: UUID) -> None:
         raise NotImplementedError

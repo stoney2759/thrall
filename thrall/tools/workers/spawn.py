@@ -3,7 +3,6 @@ import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
 from schemas.task import Task, TaskType, CapabilityProfile
-from bootstrap import state
 
 
 async def execute(call: ToolCall) -> ToolResult:
@@ -26,13 +25,12 @@ async def execute(call: ToolCall) -> ToolResult:
         allowed_tools=allowed_tools or _default_tools(task_type_enum),
     )
 
-    task = Task(type=task_type_enum, brief=brief, profile=profile)
+    task = Task(type=task_type_enum, brief=brief, profile=profile, session_id=call.session_id)
 
     # Import here to avoid circular dependency at module load
     from thrall.tasks.pool import submit
     await submit(task)
 
-    state.increment_tasks()
     return _result(call.id, output=f"task spawned: {task.id} [{task_type}]", start=start)
 
 

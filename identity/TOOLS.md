@@ -2,6 +2,23 @@
 
 Complete tool reference. Tools are called natively by the reasoning loop.
 
+## Large Data Rule
+When a tool result will exceed 10,000 chars (web pages, JSON blobs, DOM state, large files), always use `save_path` to write it to a file first, then read only the relevant section. Never pull large data through context — it accumulates across iterations and burns the token budget. One pass, write to file, parse from file.
+
+## Batch Tasks Rule
+When a task involves multiple items (races, files, URLs, pages), process them **one at a time sequentially** — never all at once in a single loop.
+
+- Fetch item 1 → save to file → confirm done → fetch item 2 → save → confirm → repeat.
+- Never accumulate results from multiple items in context simultaneously.
+- After all items are saved, do one final aggregation pass reading from files.
+- This keeps per-iteration context small regardless of how many items there are.
+
+**This applies to: race tips, batch scraping, multi-file operations, multi-URL extraction, any task with N > 1 items.**
+
+## Honest Reporting Rule
+- If you change approach from what was asked — a different tool, a workaround, a skipped or substituted step — say so in your final report: what you tried, what failed, what you did instead. Never substitute silently.
+- Report sizes, counts, cell contents and file contents from the saved file as it is now (re-read it), never from memory of an earlier step.
+
 ---
 
 ## Filesystem
@@ -29,8 +46,9 @@ Complete tool reference. Tools are called natively by the reasoning loop.
 - `browser_screenshot` — take a screenshot and return a visual description via vision
 - `browser_click` — click an element by text, role, or CSS selector
 - `browser_fill` — fill an input by label, placeholder, or selector
-- `browser_extract` — extract text, links, tables, or all content from the current page
+- `browser_extract` — extract text, links, tables, or all content from the current page. mode=js + js_expression evaluates arbitrary JavaScript (e.g. `window.__PRELOADED_STATE__`). **Use save_path for any large data extraction** — this writes the full output to a file and returns only a summary, bypassing the context cap. Never pull raw JS state blobs without save_path — they will be truncated and useless.
 - `browser_close` — close the browser session
+- `browser_scrape_structured` — auto-detect and extract structured tabular data from a page or URL. Handles HTML tables, repeated card/list elements, and multi-page pagination. Returns CSV (default) or JSON. Params: `url` (optional, navigates first), `selector` (optional CSS override), `max_pages` (default 1), `next_selector` (pagination button override), `max_rows` (default 1000), `output` (csv|json), `save_path` (workspace-relative file path to write output)
 
 ## Code
 - `code_execute` — run Python; returns stdout, stderr, exit code
@@ -49,6 +67,7 @@ Complete tool reference. Tools are called natively by the reasoning loop.
 ## Documents
 - `documents_read_pdf` — read a PDF file
 - `documents_read_docx` — read a DOCX file
+- `documents_read_csv` — read a CSV or Excel (.xlsx) file; returns pipe-separated rows. Params: `path`, `max_rows` (default 500), `include_header`, `sheet` (xlsx only)
 
 ## Audio
 - `audio_generate` — synthesise speech from text via TTS provider
@@ -99,3 +118,7 @@ Complete tool reference. Tools are called natively by the reasoning loop.
 
 ## IDE
 - `ide_diagnostics` — run a linter/type-checker (ruff → mypy → pylint auto-selected) and return diagnostics
+
+## MCP (deferred tools)
+- `mcp_search` — tools from connected MCP servers are hidden until loaded. The "MCP Servers" list in context shows what exists. Call `mcp_search` with the server name plus what you want to do (e.g. `github issue create`), then call the loaded tools — they stay loaded while you use them and unload after ~15 messages idle. If a tool you used earlier is gone, just search again. Use `select:server__tool` for an exact name.
+- App-style MCP servers (editors, office apps) usually run headless: open/new → edit → save/export to a file path. If a server exposes a command list plus a run-command tool, list the commands first rather than guessing ids.

@@ -39,13 +39,21 @@ class MCPClientManager:
             config = MCPServerConfig(
                 name=server_cfg["name"],
                 transport=server_cfg.get("transport", "stdio"),
-                command=server_cfg["command"],
+                command=server_cfg.get("command", ""),
                 args=server_cfg.get("args", []),
                 env=server_cfg.get("env", {}),
+                url=server_cfg.get("url", ""),
+                headers=server_cfg.get("headers", {}),
+                token_file=server_cfg.get("token_file", ""),
+                token_refresh_url=server_cfg.get("token_refresh_url", ""),
             )
 
             client = MCPClient(config)
-            success = await client.connect()
+            try:
+                success = await client.connect()
+            except BaseException as e:
+                logger.error(f"MCP server '{config.name}' connect raised {type(e).__name__} — skipping: {e}")
+                success = False
             self._clients[config.name] = client
 
             if not success:

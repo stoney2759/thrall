@@ -3,11 +3,13 @@ import time
 import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from bootstrap import startup
+from constants.log_files import LOG_FILE_MAIN, LOG_FILE_WEB, LOG_FILE_TELEGRAM, LOG_FILE_ERRORS
+from constants.sync import SYNC_PATH, SYNC_HEADER, SYNC_LOCAL_HOSTS
 import os
 
 # ── Exchange rate cache ───────────────────────────────────────────────────────
@@ -38,27 +40,6 @@ async def _get_fx_rate(target: str) -> float:
         return _fx_rate or 1.0
 
 _START_TIME = time.time()
-_mcp_manager = None
-
-
-async def _init_mcp() -> None:
-    global _mcp_manager
-    try:
-        from bootstrap import state
-        from services.mcp.manager import MCPClientManager
-        from services.mcp import executor as mcp_executor
-        from thrall.tools import registry as tools
-        mcp_config = state.get_config().get("mcp", {})
-        manager = MCPClientManager()
-        await manager.connect_all(mcp_config)
-        mcp_executor.set_manager(manager)
-        _mcp_manager = manager
-        mcp_tools = manager.all_tools()
-        if mcp_tools:
-            tools.register_mcp_tools(mcp_tools)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"MCP startup error: {e}")
 
 
 class CreateJobBody(BaseModel):
@@ -79,11 +60,11 @@ class StopTaskBody(BaseModel):
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
+    from services.mcp import lifecycle as mcp_lifecycle
     startup.start()
-    await _init_mcp()
+    await mcp_lifecycle.start()  # shared with the Telegram bot when both run in one process
     yield
-    if _mcp_manager:
-        await _mcp_manager.disconnect_all()
+    await mcp_lifecycle.stop()
 
 
 app = FastAPI(title="Thrall", version="2.0.0", lifespan=_lifespan)
@@ -100,6 +81,28 @@ async def health():
         "version": cfg.get("version", "2.0.0"),
         "model": model,
     })
+
+
+class SyncBody(BaseModel):
+    role: str
+    content: str
+
+
+@app.post(SYNC_PATH)
+async def internal_sync(body: SyncBody, request: Request):
+    """Telegram process → mirror a message into open webapp windows. Local callers with the shared secret only."""
+    import hmac
+    from services.transport_sync import internal_token
+    from transports.desktop.manager import sync_message
+    expected = internal_token()
+    supplied = request.headers.get(SYNC_HEADER, "")
+    host = request.client.host if request.client else ""
+    if host not in SYNC_LOCAL_HOSTS or not expected or not hmac.compare_digest(supplied, expected):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    if body.role not in ("user", "assistant"):
+        return JSONResponse({"error": "bad role"}, status_code=400)
+    await sync_message(body.role, body.content)
+    return JSONResponse({"ok": True})
 
 
 @app.get("/api/status")
@@ -252,17 +255,19 @@ async def api_delete_knowledge(fact_id: str):
 @app.get("/api/logs")
 async def api_logs(file: str = "main", lines: int = 150, min_level: str = "INFO"):
     import re
+    from bootstrap import state
     LEVELS = {"DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3, "CRITICAL": 4}
     min_lvl = LEVELS.get(min_level.upper(), 1)
 
     if file == "memory":
-        from bootstrap import state
         return JSONResponse(state.get_error_log()[-lines:])
 
     _log_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
     _files = {
-        "main":   os.path.join(_log_dir, "thrall.log"),
-        "errors": os.path.join(_log_dir, "thrall_err.log"),
+        "main":     os.path.join(_log_dir, state.get_log_file() or LOG_FILE_MAIN),  # this process's log
+        "web":      os.path.join(_log_dir, LOG_FILE_WEB),
+        "telegram": os.path.join(_log_dir, LOG_FILE_TELEGRAM),
+        "errors":   os.path.join(_log_dir, LOG_FILE_ERRORS),
     }
     path = _files.get(file)
     if not path or not os.path.isfile(path):
@@ -410,6 +415,60 @@ async def api_commands():
         {"name": cmd.name(), "description": cmd.description()}
         for cmd in sorted(all_commands(), key=lambda c: c.name())
     ])
+
+
+@app.get("/api/profiles")
+async def api_profiles():
+    from services.llm.router import list_profiles
+    return JSONResponse(list(list_profiles().keys()))
+
+
+class AuthBody(BaseModel):
+    profile: str  # e.g. "openai"
+
+
+@app.post("/api/auth/start")
+async def api_auth_start(body: AuthBody):
+    """Start OAuth PKCE flow for a credential profile. Returns the auth URL."""
+    if body.profile == "openai":
+        from services.auth import oauth_openai
+        import asyncio, time
+
+        url_holder: list[str] = []
+
+        def _capture(url: str) -> None:
+            url_holder.append(url)
+
+        asyncio.create_task(_run_openai_auth(oauth_openai, _capture))
+        for _ in range(20):
+            await asyncio.sleep(0.05)
+            if url_holder:
+                break
+
+        if not url_holder:
+            return JSONResponse({"error": "Failed to start OAuth server"}, status_code=500)
+        return JSONResponse({"auth_url": url_holder[0]})
+
+    return JSONResponse({"error": f"No OAuth handler for profile '{body.profile}'"}, status_code=400)
+
+
+async def _run_openai_auth(oauth_openai, on_url) -> None:
+    import time
+    try:
+        tokens = await oauth_openai.run_pkce_flow(on_url)
+        from services.auth import credentials
+        credentials.write_oauth(
+            profile_name="openai",
+            access_token=tokens["access_token"],
+            refresh_token=tokens.get("refresh_token", ""),
+            expires_at=tokens.get("expires_at", int(time.time()) + 3600),
+            account_id=tokens.get("account_id", ""),
+        )
+        import logging
+        logging.getLogger(__name__).info("OpenAI Codex OAuth complete")
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("OpenAI Codex OAuth failed: %s", exc)
 
 
 @app.websocket("/ws")

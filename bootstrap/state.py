@@ -54,6 +54,12 @@ class _State:
     # Reasoning effort override ("low" | "medium" | "high" | None = use config)
     reasoning_effort_override: str | None = None
 
+    # Permission mode override from /permissions ("ask" | "trusted" | "read_only" | None = use config)
+    permission_mode_override: str | None = None
+
+    # Log file this process writes (logs/<name>), set at startup
+    log_file: str | None = None
+
     # Default working directory for relative filesystem paths
     workspace_dir: str = ""
 
@@ -63,6 +69,9 @@ class _State:
     # Active personality profile
     active_profile: str = "default"
     active_profile_content: str | None = None
+
+    # Active LLM profile (set by /model @profile — separate from personality profile)
+    active_llm_profile: str | None = None
 
     # Active reasoning tasks per session — keyed by session_id string
     active_tasks: dict[str, asyncio.Task] = field(default_factory=dict)
@@ -186,6 +195,21 @@ def get_model_override() -> str | None:
     return _STATE.model_override
 
 
+def set_log_file(name: str) -> None:
+    """File name (in logs/) this process writes — set once by bootstrap.startup."""
+    _STATE.log_file = name
+
+def get_log_file() -> str | None:
+    return _STATE.log_file
+
+
+def set_permission_mode_override(mode: str | None) -> None:
+    _STATE.permission_mode_override = mode
+
+def get_permission_mode_override() -> str | None:
+    return _STATE.permission_mode_override
+
+
 def set_reasoning_effort(effort: str | None) -> None:
     _STATE.reasoning_effort_override = effort
 
@@ -250,6 +274,15 @@ def get_active_profile_content() -> str | None:
 
 def set_active_profile_content(content: str | None) -> None:
     _STATE.active_profile_content = content
+
+
+# ── Active LLM profile ────────────────────────────────────────────────────────
+
+def get_active_llm_profile() -> str | None:
+    return _STATE.active_llm_profile
+
+def set_active_llm_profile(name: str | None) -> None:
+    _STATE.active_llm_profile = name
 
 
 # ── Active reasoning tasks ────────────────────────────────────────────────────

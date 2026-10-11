@@ -20,6 +20,9 @@ from commands.heartbeat import HeartbeatCommand
 from commands.stop import StopCommand
 from commands.approve import ApproveCommand
 from commands.watch import WatchCommand
+from commands.auth import AuthCommand
+from commands.tokens import TokensCommand
+from commands.permissions import PermissionsCommand
 
 _COMMANDS: dict[str, Command] = {
     cmd.name(): cmd
@@ -44,6 +47,9 @@ _COMMANDS: dict[str, Command] = {
         StopCommand(),
         ApproveCommand(),
         WatchCommand(),
+        AuthCommand(),
+        TokensCommand(),
+        PermissionsCommand(),
     ]
 }
 

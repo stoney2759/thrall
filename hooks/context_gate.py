@@ -17,6 +17,7 @@ def build_context(
     session_context: list[dict],
     episodes: list[Episode],
     facts: list[KnowledgeFact],
+    user_facts: list[KnowledgeFact] | None = None,
 ) -> list[dict]:
     messages: list[dict] = []
 
@@ -47,6 +48,14 @@ def build_context(
 
     if system_content:
         messages.append({"role": "system", "content": system_content})
+
+    # What the user has told Thrall — loaded every turn, not only on a keyword match
+    if user_facts:
+        user_facts_block = "\n".join(f"- {f.content}" for f in user_facts)
+        messages.append({
+            "role": "system",
+            "content": f"## What the user has told me (always applies)\n{user_facts_block}",
+        })
 
     # Long-term knowledge injected as system context
     if facts:
@@ -142,10 +151,13 @@ def _build_personality_block() -> str | None:
 
 
 def _build_catalog_block() -> str | None:
-    """List available catalog agents so Thrall knows when to delegate."""
+    """List builtin agents so Thrall knows when to delegate.
+    Only builtin agents are injected — the catalog directory is user-defined and
+    too large to include in every system prompt (142+ agents = ~3k tokens/call)."""
     try:
-        from components.agents.utils import list_agents, find_incomplete_agents
-        agents = list_agents()
+        from components.agents.utils import list_agents
+        from constants.agents import BUILTIN_AGENTS_DIR
+        agents = [a for a in list_agents() if _is_builtin(a.name)]
     except Exception:
         return None
 
@@ -153,24 +165,23 @@ def _build_catalog_block() -> str | None:
         return None
 
     ready = [a for a in agents if a.allowed_tools]
-    incomplete = find_incomplete_agents()
+    if not ready:
+        return None
 
     lines = [
-        "## Available Catalog Agents",
-        "Delegate to one of these specialised agents when the user's request matches their purpose. "
+        "## Available Agents",
+        "Delegate to one of these agents when the user's request matches their purpose. "
         "Spawn with `agents.spawn profile=<name> brief=<task>`.",
     ]
     for a in ready:
         lines.append(f"- **{a.name}**: {a.description}")
 
-    if incomplete:
-        lines.append(f"\n## Catalog Agents Needing Setup ({len(incomplete)})")
-        lines.append(
-            "These agents have no tools assigned and cannot be spawned yet. "
-            "When the user asks you to prepare, set up, or make ready any of these agents, "
-            "call `agents.prepare` with the agent name. Do NOT create a new agent — fix the existing one."
-        )
-        for a in incomplete:
-            lines.append(f"- **{a.name}**: {a.description or '(no description)'}")
-
     return "\n".join(lines)
+
+
+def _is_builtin(name: str) -> bool:
+    try:
+        from constants.agents import BUILTIN_AGENTS_DIR
+        return (BUILTIN_AGENTS_DIR / f"{name}.toml").exists()
+    except Exception:
+        return False

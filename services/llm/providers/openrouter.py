@@ -162,14 +162,18 @@ def _parse_xml_tool_calls(content: str) -> tuple[list[ToolCallRequest], str]:
 # ── Response parser ────────────────────────────────────────────────────────────
 
 def _parse_usage(data: dict) -> LLMUsage:
-    u = data.get("usage", {})
+    # OpenRouter nests cache/reasoning counts in *_tokens_details; older/other
+    # providers return them flat — read nested first, fall back to flat.
+    u = data.get("usage") or {}
+    prompt_details = u.get("prompt_tokens_details") or {}
+    completion_details = u.get("completion_tokens_details") or {}
     return LLMUsage(
         prompt_tokens=u.get("prompt_tokens", 0),
         completion_tokens=u.get("completion_tokens", 0),
         total_tokens=u.get("total_tokens", 0),
-        reasoning_tokens=u.get("reasoning_tokens", 0),
-        cached_tokens=u.get("cached_tokens", 0),
-        cost_usd=float(u.get("cost", 0.0)),
+        reasoning_tokens=completion_details.get("reasoning_tokens") or u.get("reasoning_tokens", 0) or 0,
+        cached_tokens=prompt_details.get("cached_tokens") or u.get("cached_tokens", 0) or 0,
+        cost_usd=float(u.get("cost", 0.0) or 0.0),
     )
 
 

@@ -37,6 +37,9 @@ class MemoryStore:
     async def search_facts(self, query: str, limit: int = 10) -> list[KnowledgeFact]:
         return await self._fact_backend.search_facts(query, limit)
 
+    async def list_facts(self, limit: int) -> list[KnowledgeFact]:
+        return await self._fact_backend.list_facts(limit)
+
     async def delete_fact(self, fact_id: UUID) -> None:
         await self._fact_backend.delete_fact(fact_id)
 

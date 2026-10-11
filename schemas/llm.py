@@ -30,6 +30,7 @@ class LLMResponse:
     reasoning: str | None = None
     reasoning_details: list[dict] = field(default_factory=list)
     usage: LLMUsage = field(default_factory=LLMUsage)
+    model: str = ""  # model that actually served the request (set by services.llm.client)
 
     @property
     def has_tool_calls(self) -> bool:

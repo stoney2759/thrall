@@ -8,7 +8,6 @@ from schemas.tool import ToolCall
 from interfaces.task import BaseTask
 from services.llm import client as llm
 from hooks import tool_gate
-from bootstrap import state
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +49,9 @@ class LocalTask(BaseTask):
         except Exception as e:
             self.task = self.task.model_copy(update={"status": TaskStatus.FAILED, "error": str(e), "completed_at": datetime.now(timezone.utc)})
             _store_result(self.task)
+            from bootstrap import state
             state.log_error(f"Agent {self.task.id} failed: {e}")
             return f"error: {e}"
-        finally:
-            state.decrement_tasks()
 
     async def _reason(self) -> str:
         from thrall.tools import registry as tools
@@ -127,7 +125,6 @@ class LocalTask(BaseTask):
         self._cancelled = True
         self.task = self.task.model_copy(update={"status": TaskStatus.CANCELLED, "completed_at": datetime.now(timezone.utc)})
         _store_result(self.task)
-        state.decrement_tasks()
 
 
 def _store_result(task: Task) -> None:

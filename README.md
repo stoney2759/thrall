@@ -55,6 +55,8 @@ pip install -r requirements.txt
 ```bash
 cp config/config.example.toml config/config.toml
 cp .env.example .env
+# optional — named model profiles for /model @name
+cp config/profiles.example.toml config/profiles.toml
 ```
 
 Edit `config/config.toml`:
@@ -73,19 +75,35 @@ Edit `.env`:
 
 ### 3. Run
 
-```powershell
-# Windows — full stack (API + Dashboard + Telegram)
-.\start.ps1
+One launcher for everything (Windows, macOS, Linux):
 
-# Desktop webapp only (recommended starting point)
-.\start-api.ps1
-.\start-dashboard.ps1
-
-# Telegram only
-.\start-telegram.ps1
+```bash
+python thrall.py
 ```
 
-Open `http://localhost:8000` to access the dashboard.
+It asks what to start:
+
+```
+  1) Webapp + Telegram   (recommended — one process, shared memory)
+  2) Webapp only
+  3) Telegram only
+  4) Terminal chat
+```
+
+Skip the menu with a flag — useful for autostart and Docker:
+
+```bash
+python thrall.py --all        # webapp + Telegram
+python thrall.py --web        # webapp only
+python thrall.py --telegram   # Telegram only
+python thrall.py --cli        # terminal chat
+python thrall.py --all --no-build   # don't rebuild the webapp
+```
+
+`thrall.py` uses the project's `venv` automatically, builds the webapp when it's missing or out of
+date (needs Node.js), and never stops other programs — if the port is busy it tells you instead.
+
+Open `http://localhost:8000` to access the webapp. Logs are in `logs/` (`thrall.log` for webapp + Telegram).
 
 ---
 
@@ -112,6 +130,8 @@ Open `http://localhost:8000` to access the dashboard.
 | `/profile [name]` | Switch Thrall's active personality profile |
 | `/watch <url>` | Download, transcribe, extract frames, and analyse a video |
 | `/voice` | Toggle voice response mode (Telegram) |
+| `/permissions [ask\|trusted\|read_only]` | Show or change the permission mode |
+| `/tokens` | Token usage, context size and cost for this session |
 
 ---
 
@@ -197,7 +217,7 @@ Thrall ships with 14 core agents. The system accepts any `.toml` agent definitio
 | `agent-hunter` | Find the right agent for a task from the catalog |
 | `video-downloader` | Download video from a URL via yt-dlp |
 | `video-processor` | Extract frames and analyse video content |
-| `youtube-transcriber` | Download and transcribe a YouTube video |
+| `video-transcriber` | Download and transcribe a supported video or audio URL |
 | `viral-signal-extractor` | Extract timestamp-cited virality signals (hooks, open loops, payoffs, CTAs) from video transcripts into structured JSON |
 
 ---
@@ -237,22 +257,31 @@ Audit log: append-only, 50MB max, 7-day retention.
 
 ---
 
-## MCP Integrations
+## MCP Servers
 
-| Server | Status | Purpose |
-|--------|--------|---------|
-| github | Enabled | Repos, issues, PRs, code search |
-| gmail | Disabled | Read, send, search email |
-| google-calendar | Disabled | Events and scheduling |
-| google-drive | Disabled | Files and documents |
-| brave-search | Disabled | Web search via Brave API |
-| youtube | Disabled | Video search, metadata, transcripts |
-| slack | Disabled | Team messaging, channels, search |
-| notion | Disabled | Docs, notes, and databases |
-| postgres | Disabled | Direct PostgreSQL database access |
-| sqlite | Disabled | Local SQLite database access |
+Thrall works with **any MCP server** — official ones, community ones, or your own. None are
+bundled; you add the ones you want to `config/config.toml`:
 
-Enable any server in `config/config.toml` (`enabled = true`) and add credentials to `.env`.
+```toml
+[[mcp.servers]]
+name = "my-server"
+transport = "stdio"                  # or "http"
+command = "path/to/server-binary"    # stdio: the command that starts the server
+args = ["mcp"]
+env = {}
+enabled = true
+
+# http servers instead use:  url = "https://…/mcp"
+# optional bearer token:      token_file = "config/my-server-token.json"
+# optional token refresh:     token_refresh_url = "https://…/refresh"
+```
+
+`config.example.toml` includes ready-made examples (GitHub, Gmail, Google Drive, Brave Search,
+Slack, Notion, Postgres, SQLite). Add any credentials they need to `.env`.
+
+You can connect hundreds of MCP tools without overloading the model: Thrall only sees a one-line
+list of your servers, and loads a server's tools on demand (`mcp_search`) when a task needs them.
+Tools unused for a while are unloaded again.
 
 ---
 

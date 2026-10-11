@@ -122,3 +122,36 @@ command = "npx"
 args = ["-y", "@modelcontextprotocol/server-brave-search"]
 env = { BRAVE_API_KEY = "" }
 enabled = false
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+# One rotating file per process (logs/thrall.log, logs/thrall-main.log), 20 MB x 5.
+# INFO for normal use; DEBUG adds per-step LLM token/cost lines for development.
+[logging]
+level = "INFO"
+
+# ── Skills ───────────────────────────────────────────────────────────────────
+# Folders containing SKILL.md (frontmatter name + description, then instructions).
+# Searched up to 4 levels deep. Relative paths are relative to the Thrall root.
+# A one-line catalog goes into context; skill_load pulls in the full instructions.
+[skills]
+dirs = ["skills"]
+ignore = []
+
+# ── Harness ──────────────────────────────────────────────────────────────────
+# action_footer: add a line to replies listing what was actually changed this turn,
+# built from the tool record (not written by the model). Off by default.
+[harness]
+action_footer = false
+
+# ── Permissions ──────────────────────────────────────────────────────────────
+# mode: ask (reads run freely; anything that changes something asks you first),
+#       trusted (everything runs), read_only (nothing that changes anything).
+# Release default: ask. Use trusted only on a machine you alone control.
+# Rules: "tool_glob" or "tool_glob:arg_glob" — deny always wins. Examples:
+#   allow = ["shell_run:git status*", "filesystem_write:workspace/**", "deckcraft__*"]
+#   deny  = ["powershell_run:*Remove-Item*"]
+# Change at runtime with /permissions ask | trusted | read_only | reset.
+[permissions]
+mode = "ask"
+allow = []
+deny = []

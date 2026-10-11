@@ -44,6 +44,8 @@ interface Store {
   messages: ChatMessage[];
   wsStatus: WsStatus;
   typingSessions: string[];
+  /** Live steps per session while Thrall is working (cleared when it stops typing). */
+  progressBySession: Record<string, string[]>;
   sessionId: string | null;
   activePanel: Panel;
   sessions: Session[];
@@ -52,6 +54,7 @@ interface Store {
   addMessage: (role: MsgRole, content: string, targetSessionId?: string | null) => void;
   setWsStatus: (s: WsStatus) => void;
   setTyping: (sessionId: string | null, isTyping: boolean) => void;
+  addProgress: (sessionId: string | null, text: string) => void;
   setSessionId: (id: string) => void;
   setPanel: (p: Panel) => void;
   clearChat: () => void;
@@ -65,6 +68,7 @@ export const useStore = create<Store>((set) => ({
   messages: _initSessions.find((s) => s.id === _initActiveId)?.messages ?? [],
   wsStatus: 'disconnected',
   typingSessions: [],
+  progressBySession: {},
   sessionId: null,
   activePanel: 'chat',
   sessions: _initSessions,
@@ -90,11 +94,22 @@ export const useStore = create<Store>((set) => ({
   },
 
   setWsStatus: (wsStatus) => set({ wsStatus }),
-  setTyping: (sessionId, isTyping) => set((s) => ({
-    typingSessions: isTyping
+  setTyping: (sessionId, isTyping) => set((s) => {
+    const typingSessions = isTyping
       ? sessionId && !s.typingSessions.includes(sessionId) ? [...s.typingSessions, sessionId] : s.typingSessions
-      : sessionId ? s.typingSessions.filter((id) => id !== sessionId) : [],
-  })),
+      : sessionId ? s.typingSessions.filter((id) => id !== sessionId) : [];
+    if (isTyping) return { typingSessions };
+    // Task over — drop its live steps
+    const progressBySession = { ...s.progressBySession };
+    if (sessionId) delete progressBySession[sessionId];
+    return { typingSessions, progressBySession: sessionId ? progressBySession : {} };
+  }),
+  addProgress: (sessionId, text) => set((s) => {
+    const id = sessionId ?? s.activeSessionId;
+    const steps = s.progressBySession[id] ?? [];
+    if (steps[steps.length - 1] === text) return {};
+    return { progressBySession: { ...s.progressBySession, [id]: [...steps, text] } };
+  }),
   setSessionId: (sessionId) => set({ sessionId }),
   setPanel: (activePanel) => set({ activePanel }),
 

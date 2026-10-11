@@ -3,6 +3,7 @@ import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
 from hooks.input_gate import sanitize_external
+from services import session_memory
 from thrall.tools.filesystem._resolve import resolve, is_protected
 
 
@@ -18,6 +19,7 @@ def execute(call: ToolCall) -> ToolResult:
 
         content = path.read_text(encoding="utf-8", errors="replace")
         cleaned = sanitize_external(content)
+        session_memory.note_file_seen(call.session_id, path)  # edit guard: this file may now be edited
         return _result(call.id, output=cleaned, start=start)
     except PermissionError:
         return _result(call.id, error=f"permission denied: {path}", start=start)

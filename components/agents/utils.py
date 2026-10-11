@@ -1,37 +1,41 @@
 from __future__ import annotations
 from pathlib import Path
+from constants.agents import BUILTIN_AGENTS_DIR, CATALOG_AGENTS_DIR
 from components.agents.types import AgentDefinition
-
-_CATALOG_DIR = Path(__file__).parent.parent.parent / "components" / "agents" / "catalog"
 
 
 def _catalog_path(name: str) -> Path:
-    return _CATALOG_DIR / f"{name}.toml"
+    return CATALOG_AGENTS_DIR / f"{name}.toml"
+
+
+def _builtin_path(name: str) -> Path:
+    return BUILTIN_AGENTS_DIR / f"{name}.toml"
 
 
 def save_agent(agent: AgentDefinition) -> Path:
-    _CATALOG_DIR.mkdir(parents=True, exist_ok=True)
+    CATALOG_AGENTS_DIR.mkdir(parents=True, exist_ok=True)
     path = _catalog_path(agent.name)
     path.write_text(_to_toml(agent), encoding="utf-8")
     return path
 
 
 def load_agent(name: str) -> AgentDefinition | None:
-    path = _catalog_path(name)
-    if not path.exists():
-        return None
-    return _from_toml(path.read_text(encoding="utf-8"))
+    for path in (_builtin_path(name), _catalog_path(name)):
+        if path.exists():
+            return _from_toml(path.read_text(encoding="utf-8"))
+    return None
 
 
 def list_agents() -> list[AgentDefinition]:
-    if not _CATALOG_DIR.exists():
-        return []
     agents = []
-    for path in sorted(_CATALOG_DIR.rglob("*.toml")):
-        try:
-            agents.append(_from_toml(path.read_text(encoding="utf-8")))
-        except Exception:
+    for base_dir in (BUILTIN_AGENTS_DIR, CATALOG_AGENTS_DIR):
+        if not base_dir.exists():
             continue
+        for path in sorted(base_dir.rglob("*.toml")):
+            try:
+                agents.append(_from_toml(path.read_text(encoding="utf-8")))
+            except Exception:
+                continue
     return agents
 
 
@@ -40,7 +44,7 @@ def list_agent_names() -> list[str]:
 
 
 def find_incomplete_agents() -> list[AgentDefinition]:
-    """Return catalog agents that have no tools assigned — need inference before use."""
+    """Return agents that have no tools assigned — need inference before use."""
     return [a for a in list_agents() if not a.allowed_tools]
 
 

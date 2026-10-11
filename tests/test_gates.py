@@ -103,7 +103,7 @@ class TestOutputGateSecrets:
     def test_secret_is_redacted(self, secret, description):
         result = output_gate.run(f"Here is your config: {secret}")
         assert result.allowed is True
-        assert "[SECRET REDACTED]" in result.content, f"{description} not redacted"
+        assert "*...*" in result.content, f"{description} not masked"
         assert secret not in result.content
 
     def test_clean_response_passes(self):
@@ -131,7 +131,7 @@ class TestOutputGateSecrets:
 
 class TestToolGate:
     def test_always_allowed_tool_passes(self, thrall_tool_call):
-        call = ToolCall(session_id=uuid4(), name="filesystem.read",
+        call = ToolCall(session_id=uuid4(), name="filesystem_read",
                         args={}, caller="agent:abc")
         assert tool_gate.is_allowed(call) is True
 
@@ -142,11 +142,11 @@ class TestToolGate:
         assert tool_gate.is_allowed(agent_tool_call) is False
 
     def test_restricted_tool_allowed_with_matching_profile(self, agent_tool_call):
-        profile = CapabilityProfile(name="writer", allowed_tools=["filesystem.write"])
+        profile = CapabilityProfile(name="writer", allowed_tools=["filesystem_write"])
         assert tool_gate.is_allowed(agent_tool_call, profile) is True
 
     def test_restricted_tool_denied_with_wrong_profile(self, agent_tool_call):
-        profile = CapabilityProfile(name="reader", allowed_tools=["filesystem.read"])
+        profile = CapabilityProfile(name="reader", allowed_tools=["filesystem_read"])
         assert tool_gate.is_allowed(agent_tool_call, profile) is False
 
     def test_unknown_tool_denied_for_agent(self):

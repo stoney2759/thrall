@@ -80,6 +80,7 @@ async def _run(worker: BaseTask) -> None:
             completed_at=t.completed_at.isoformat() if t.completed_at else None,
         )
         _pool.pop(worker.id, None)
+        state.decrement_tasks()
         for cb in _completion_callbacks:
             try:
                 await cb(worker.task)

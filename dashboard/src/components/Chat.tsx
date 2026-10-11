@@ -8,7 +8,12 @@ import type { Session } from '../store';
 interface Props {
   onSend: (content: string) => void;
   typing: boolean;
+  /** Live steps while Thrall works, oldest first. */
+  progress: string[];
 }
+
+/** Steps shown under the timer while Thrall works. */
+const PROGRESS_VISIBLE = 6;
 
 interface AttachedImage {
   name: string;
@@ -173,7 +178,7 @@ function SessionTab({ session, active, isMain, onSwitch, onClose, onRename }: Se
   );
 }
 
-export default function Chat({ onSend, typing }: Props) {
+export default function Chat({ onSend, typing, progress }: Props) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -193,12 +198,16 @@ export default function Chat({ onSend, typing }: Props) {
   const [input, setInput] = useState('');
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [commands, setCommands] = useState<CommandEntry[]>([]);
+  const [profiles, setProfiles] = useState<string[]>([]);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdIndex, setCmdIndex] = useState(0);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileIndex, setProfileIndex] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const paletteRef = useRef<HTMLDivElement>(null);
+  const profilePaletteRef = useRef<HTMLDivElement>(null);
 
   // Load draft for this session when session changes
   useEffect(() => {
@@ -281,6 +290,10 @@ export default function Chat({ onSend, typing }: Props) {
       .then((r) => r.json())
       .then((data) => setCommands(data as CommandEntry[]))
       .catch(() => {});
+    fetch('/api/profiles')
+      .then((r) => r.json())
+      .then((data) => setProfiles(data as string[]))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -293,10 +306,21 @@ export default function Chat({ onSend, typing }: Props) {
     ? commands.filter((c) => c.name.startsWith(cmdQuery))
     : [];
 
+  // Profile palette — active when input is "/model @<partial>"
+  const profileMatchResult = /^\/model\s+@(\S*)$/.exec(input);
+  const profileQuery = profileMatchResult ? profileMatchResult[1].toLowerCase() : '';
+  const filteredProfiles = profileOpen
+    ? profiles.filter((p) => p.toLowerCase().startsWith(profileQuery))
+    : [];
+
   // Keep index in bounds when filter changes
   useEffect(() => {
     setCmdIndex(0);
   }, [cmdQuery]);
+
+  useEffect(() => {
+    setProfileIndex(0);
+  }, [profileQuery]);
 
   // Scroll active item into view
   useEffect(() => {
@@ -305,9 +329,22 @@ export default function Chat({ onSend, typing }: Props) {
     item?.scrollIntoView({ block: 'nearest' });
   }, [cmdIndex, cmdOpen, filteredCmds.length]);
 
+  useEffect(() => {
+    if (!profileOpen || filteredProfiles.length === 0) return;
+    const item = profilePaletteRef.current?.children[profileIndex] as HTMLElement | undefined;
+    item?.scrollIntoView({ block: 'nearest' });
+  }, [profileIndex, profileOpen, filteredProfiles.length]);
+
   function selectCmd(cmd: CommandEntry) {
     setInput(`/${cmd.name} `);
     setCmdOpen(false);
+    textareaRef.current?.focus();
+  }
+
+  function selectProfile(name: string) {
+    setInput(`/model @${name} `);
+    setProfileOpen(false);
+    setProfileIndex(0);
     textareaRef.current?.focus();
   }
 
@@ -326,12 +363,36 @@ export default function Chat({ onSend, typing }: Props) {
 
     setInput('');
     setCmdOpen(false);
+    setProfileOpen(false);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     try { localStorage.removeItem(`thrall_draft_${activeSessionId}`); } catch { /* ignore */ }
     onSend(content);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (profileOpen && filteredProfiles.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setProfileIndex((i) => Math.min(i + 1, filteredProfiles.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setProfileIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault();
+        if (filteredProfiles[profileIndex]) selectProfile(filteredProfiles[profileIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setProfileOpen(false);
+        return;
+      }
+    }
+
     if (cmdOpen && filteredCmds.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -365,6 +426,7 @@ export default function Chat({ onSend, typing }: Props) {
     const val = e.target.value;
     setInput(val);
     setCmdOpen(val.startsWith('/'));
+    setProfileOpen(/^\/model\s+@\S*$/.test(val));
     const el = e.target;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
@@ -491,6 +553,7 @@ export default function Chat({ onSend, typing }: Props) {
                 </div> */}
 
                 {/* OPTION 3 — Torus of dots (parametric, R=7 major, r=3 tube, 14×6 grid) */}
+                <div className="flex flex-col gap-1 min-w-0">
                 <div className="flex items-center gap-2 pt-1.5">
                 <div style={{ transform: 'rotateZ(-30deg)' }}>
                 <div style={{ perspective: '120px' }}>
@@ -527,6 +590,18 @@ export default function Chat({ onSend, typing }: Props) {
                   <span className="text-xs text-muted tabular-nums select-none">
                     {elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`}
                   </span>
+                )}
+                </div>
+                {/* Live steps — what Thrall is doing right now (most recent last) */}
+                {progress.length > 0 && (
+                  <ul className="text-xs text-muted space-y-0.5 select-none">
+                    {progress.slice(-PROGRESS_VISIBLE).map((step, i, shown) => (
+                      <li key={`${progress.length - shown.length + i}-${step}`}
+                          className={i === shown.length - 1 ? 'text-primary/80' : 'opacity-60'}>
+                        {i === shown.length - 1 ? '▸' : '✓'} {step}
+                      </li>
+                    ))}
+                  </ul>
                 )}
                 </div>
 
@@ -583,7 +658,29 @@ export default function Chat({ onSend, typing }: Props) {
 
         {/* Command palette — floats above input */}
         <div className="relative">
-          {cmdOpen && filteredCmds.length > 0 && (
+          {profileOpen && filteredProfiles.length > 0 && (
+            <div
+              ref={profilePaletteRef}
+              className="absolute bottom-full mb-2 left-0 right-0 bg-elevated border border-border rounded-xl shadow-xl overflow-hidden max-h-48 overflow-y-auto z-50"
+            >
+              <div className="px-4 py-1.5 text-xs text-muted border-b border-border select-none">Profiles</div>
+              {filteredProfiles.map((name, i) => (
+                <button
+                  key={name}
+                  onMouseDown={(e) => { e.preventDefault(); selectProfile(name); }}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                    i === profileIndex
+                      ? 'bg-accent/15 text-primary'
+                      : 'text-primary hover:bg-surface'
+                  }`}
+                >
+                  <span className="text-accent text-sm font-mono font-medium">@{name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {cmdOpen && !profileOpen && filteredCmds.length > 0 && (
             <div
               ref={paletteRef}
               className="absolute bottom-full mb-2 left-0 right-0 bg-elevated border border-border rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto z-50"

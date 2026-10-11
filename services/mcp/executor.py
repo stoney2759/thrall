@@ -31,7 +31,4 @@ async def execute(tool_name: str, args: dict[str, Any]) -> str:
     if client is None:
         return f"Error: MCP server '{server_name}' not found"
 
-    if not client.available:
-        return f"Error: MCP server '{server_name}' is not available"
-
     return await client.call_tool(bare_tool_name, args)

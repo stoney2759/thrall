@@ -20,4 +20,5 @@ COPY . .
 # Expose the WebSocket / HTTP API port
 EXPOSE 8000
 
-CMD ["python", "run.py"]
+# Webapp + Telegram in one process; the webapp is prebuilt (no Node in this image)
+CMD ["python", "thrall.py", "--all", "--no-build"]

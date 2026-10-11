@@ -117,6 +117,29 @@ class QdrantBackend(MemoryBackend):
             logger.error(f"Qdrant search_facts failed: {e}")
             return []
 
+    async def list_facts(self, limit: int) -> list[KnowledgeFact]:
+        if not self._ready:
+            return []
+        try:
+            points, _next = await self._client.scroll(
+                collection_name=_FACTS_COLLECTION, limit=limit, with_payload=True, with_vectors=False,
+            )
+            return [
+                KnowledgeFact(
+                    id=r.id,
+                    content=r.payload["content"],
+                    source=r.payload.get("source", "thrall"),
+                    confidence=float(r.payload.get("confidence", 1.0)),
+                    tags=r.payload.get("tags", []),
+                    created_at=r.payload.get("created_at"),
+                    updated_at=r.payload.get("updated_at"),
+                )
+                for r in points
+            ]
+        except Exception as e:
+            logger.error(f"Qdrant list_facts failed: {e}")
+            return []
+
     async def delete_fact(self, fact_id: UUID) -> None:
         if not self._ready:
             return

@@ -3,25 +3,29 @@ from schemas.tool import ToolCall, GateDecision
 from schemas.task import CapabilityProfile
 from hooks import audit
 
-# Tools that require explicit capability profile permission (never available by default)
+# Tools that require explicit capability profile permission (never available by default).
+# Names match the registry (underscore form) — the old dotted names never matched a real tool.
+# Thrall's own calls are further checked by services/permissions (ask / trusted / read_only).
 _RESTRICTED_TOOLS: set[str] = {
-    "code.execute",
-    "shell.run",
-    "filesystem.write",
-    "filesystem.edit",
-    "agents.spawn",
+    "code_execute",
+    "shell_run",
+    "powershell_run",
+    "filesystem_write",
+    "filesystem_edit",
+    "filesystem_append",
+    "agents_spawn",
 }
 
-# Tools always available to Thrall directly (no profile needed)
+# Tools always available to any caller (read-only, no profile needed)
 _ALWAYS_ALLOWED: set[str] = {
-    "filesystem.read",
-    "filesystem.glob",
-    "filesystem.grep",
-    "web.search",
-    "web.fetch",
-    "web.scrape",
-    "web.browse",
-    "memory.read",
+    "filesystem_read",
+    "filesystem_glob",
+    "filesystem_grep",
+    "web_search",
+    "web_fetch",
+    "web_scrape",
+    "web_browse",
+    "memory_read",
 }
 
 

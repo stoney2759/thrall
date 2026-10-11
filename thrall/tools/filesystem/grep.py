@@ -20,7 +20,10 @@ def execute(call: ToolCall) -> ToolResult:
         regex = re.compile(pattern, flags)
         results: list[str] = []
 
-        for path in root.glob(glob_filter):
+        # If path points directly to a file, search it; otherwise glob the directory
+        candidates = [root] if root.is_file() else list(root.glob(glob_filter))
+
+        for path in candidates:
             if not path.is_file() or is_protected(path):
                 continue
             try:

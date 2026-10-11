@@ -4,6 +4,7 @@ import inspect
 import logging
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
+from constants.tools import PROVIDER_TOOL_LIMIT, MCP_CATALOG_SAMPLE_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,8 @@ from thrall.tools.scheduler import add as sched_add, list as sched_list, delete 
 from thrall.tools.git import run as git_run
 from thrall.tools.clipboard import read as clip_read, write as clip_write, save as clip_save, load as clip_load, snippets as clip_snippets
 from thrall.tools.system import info as sys_info
-from thrall.tools.documents import read_pdf as doc_read_pdf, read_docx as doc_read_docx
-from thrall.tools.browser import navigate as browser_navigate, screenshot as browser_screenshot, click as browser_click, fill as browser_fill, extract as browser_extract, close as browser_close
+from thrall.tools.documents import read_pdf as doc_read_pdf, read_docx as doc_read_docx, read_csv as doc_read_csv
+from thrall.tools.browser import navigate as browser_navigate, screenshot as browser_screenshot, click as browser_click, fill as browser_fill, extract as browser_extract, close as browser_close, scrape_structured as browser_scrape_structured
 from thrall.tools.audio import generate as audio_generate
 from thrall.tools.profile import switch as profile_switch
 from thrall.tools.video import download as video_download
@@ -30,6 +31,9 @@ from thrall.tools.vision import analyze as vision_analyze
 from thrall.tools.interaction import ask_user as interaction_ask_user, monitor as interaction_monitor
 from thrall.tools.notebook import read as notebook_read, edit as notebook_edit
 from thrall.tools.ide import diagnostics as ide_diagnostics
+from thrall.tools.mcp import search as mcp_search
+from thrall.tools.todo import write as todo_write
+from thrall.tools.skills import load as skill_load
 from thrall.tools.audit_hook import before_call, after_call
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -74,12 +78,14 @@ _TOOLS: dict = {
     sys_info.NAME: sys_info.execute,
     doc_read_pdf.NAME: doc_read_pdf.execute,
     doc_read_docx.NAME: doc_read_docx.execute,
+    doc_read_csv.NAME: doc_read_csv.execute,
     browser_navigate.NAME: browser_navigate.execute,
     browser_screenshot.NAME: browser_screenshot.execute,
     browser_click.NAME: browser_click.execute,
     browser_fill.NAME: browser_fill.execute,
     browser_extract.NAME: browser_extract.execute,
     browser_close.NAME: browser_close.execute,
+    browser_scrape_structured.NAME: browser_scrape_structured.execute,
     audio_generate.NAME: audio_generate.execute,
     profile_switch.NAME: profile_switch.execute,
     video_download.NAME: video_download.execute,
@@ -91,6 +97,9 @@ _TOOLS: dict = {
     notebook_read.NAME: notebook_read.execute,
     notebook_edit.NAME: notebook_edit.execute,
     ide_diagnostics.NAME: ide_diagnostics.execute,
+    mcp_search.NAME: mcp_search.execute,
+    todo_write.NAME: todo_write.execute,
+    skill_load.NAME: skill_load.execute,
 }
 
 _SCHEMAS: dict = {
@@ -133,12 +142,14 @@ _SCHEMAS: dict = {
     sys_info.NAME: (sys_info.DESCRIPTION, sys_info.PARAMETERS),
     doc_read_pdf.NAME: (doc_read_pdf.DESCRIPTION, doc_read_pdf.PARAMETERS),
     doc_read_docx.NAME: (doc_read_docx.DESCRIPTION, doc_read_docx.PARAMETERS),
+    doc_read_csv.NAME: (doc_read_csv.DESCRIPTION, doc_read_csv.PARAMETERS),
     browser_navigate.NAME: (browser_navigate.DESCRIPTION, browser_navigate.PARAMETERS),
     browser_screenshot.NAME: (browser_screenshot.DESCRIPTION, browser_screenshot.PARAMETERS),
     browser_click.NAME: (browser_click.DESCRIPTION, browser_click.PARAMETERS),
     browser_fill.NAME: (browser_fill.DESCRIPTION, browser_fill.PARAMETERS),
     browser_extract.NAME: (browser_extract.DESCRIPTION, browser_extract.PARAMETERS),
     browser_close.NAME: (browser_close.DESCRIPTION, browser_close.PARAMETERS),
+    browser_scrape_structured.NAME: (browser_scrape_structured.DESCRIPTION, browser_scrape_structured.PARAMETERS),
     audio_generate.NAME: (audio_generate.DESCRIPTION, audio_generate.PARAMETERS),
     profile_switch.NAME: (profile_switch.DESCRIPTION, profile_switch.PARAMETERS),
     video_download.NAME: (video_download.DESCRIPTION, video_download.PARAMETERS),
@@ -150,6 +161,9 @@ _SCHEMAS: dict = {
     notebook_read.NAME: (notebook_read.DESCRIPTION, notebook_read.PARAMETERS),
     notebook_edit.NAME: (notebook_edit.DESCRIPTION, notebook_edit.PARAMETERS),
     ide_diagnostics.NAME: (ide_diagnostics.DESCRIPTION, ide_diagnostics.PARAMETERS),
+    mcp_search.NAME: (mcp_search.DESCRIPTION, mcp_search.PARAMETERS),
+    todo_write.NAME: (todo_write.DESCRIPTION, todo_write.PARAMETERS),
+    skill_load.NAME: (skill_load.DESCRIPTION, skill_load.PARAMETERS),
 }
 
 
@@ -165,15 +179,72 @@ def register_mcp_tools(tool_defs: list[dict]) -> None:
         _MCP_TOOLS[name] = tool_def
 
 
-def get_definitions(allowed: list[str] | None = None) -> list[dict]:
+def get_definitions(allowed: list[str] | None = None, loaded_mcp: list[str] | None = None) -> list[dict]:
+    """Tool definitions for one LLM request.
+
+    allowed=None (Thrall): every native tool + only the MCP tools in loaded_mcp (deferred loading —
+    MCP tools stay hidden until Thrall loads them with mcp_search). allowed=[...] (workers): exactly
+    the listed tools, native or MCP, as granted by the capability profile.
+    """
     native = list(_SCHEMAS.keys())
     names = allowed if allowed is not None else native
     result = [_to_openai_def(name) for name in names if name in _SCHEMAS]
-    if allowed is None:
-        result.extend(_MCP_TOOLS.values())
-    else:
-        result.extend(v for k, v in _MCP_TOOLS.items() if k in allowed)
+    mcp_names = allowed if allowed is not None else (loaded_mcp or [])
+    result.extend(_MCP_TOOLS[k] for k in mcp_names if k in _MCP_TOOLS)
+    if len(result) > PROVIDER_TOOL_LIMIT:
+        logger.warning("Tool list %d exceeds provider limit %d — truncating", len(result), PROVIDER_TOOL_LIMIT)
+        result = result[:PROVIDER_TOOL_LIMIT]
     return result
+
+
+def search_mcp(query: str, limit: int) -> list[str]:
+    """Rank registered MCP tools against a query; returns up to `limit` tool names.
+
+    A query term matching a server name scores that server's tools; terms found in the tool's own
+    name score highest, then its description. `select:a,b` loads exact tool names.
+    """
+    query = query.strip()
+    if query.lower().startswith("select:"):
+        wanted = [n.strip() for n in query[len("select:"):].split(",") if n.strip()]
+        return [n for n in wanted if n in _MCP_TOOLS][:limit]
+    terms = [t for t in query.lower().replace("_", " ").split() if t]
+    scored: list[tuple[int, str]] = []
+    for name, tool_def in _MCP_TOOLS.items():
+        server, _, short = name.partition("__")
+        short_l = short.lower().replace("_", " ")
+        desc_l = (tool_def["function"].get("description") or "").lower()
+        score = 0
+        for t in terms:
+            if t == server.lower():
+                score += 2
+            if t in short_l:
+                score += 3
+            elif t in desc_l:
+                score += 1
+        if score > 0:
+            scored.append((score, name))
+    scored.sort(key=lambda s: (-s[0], s[1]))
+    return [name for _, name in scored[:limit]]
+
+
+def mcp_catalog() -> str:
+    """One line per connected MCP server: tool count + example names. Injected into Thrall's context."""
+    by_server: dict[str, list[str]] = {}
+    for name in _MCP_TOOLS:
+        server, _, short = name.partition("__")
+        by_server.setdefault(server, []).append(short)
+    lines = []
+    for server in sorted(by_server):
+        shorts = by_server[server]
+        sample = ", ".join(shorts[:MCP_CATALOG_SAMPLE_TOOLS])
+        lines.append(f"- {server}: {len(shorts)} tools (e.g. {sample})")
+    return "\n".join(lines)
+
+
+def mcp_tool_summary(name: str) -> str:
+    """`name — first line of description` for reporting what mcp_search loaded."""
+    desc = (_MCP_TOOLS[name]["function"].get("description") or "").strip().split("\n")[0]
+    return f"{name} — {desc[:160]}"
 
 
 def _to_openai_def(name: str) -> dict:

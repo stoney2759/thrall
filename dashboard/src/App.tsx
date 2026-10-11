@@ -12,7 +12,7 @@ import MemoryPanel from './components/MemoryPanel';
 import SessionsPanel from './components/SessionsPanel';
 
 export default function App() {
-  const { activePanel, setWsStatus, setTyping, addMessage, setSessionId, activeSessionId, typingSessions } = useStore();
+  const { activePanel, setWsStatus, setTyping, addMessage, addProgress, setSessionId, activeSessionId, typingSessions, progressBySession } = useStore();
   const wsRef = useRef<WsClient | null>(null);
 
   useEffect(() => {
@@ -22,6 +22,8 @@ export default function App() {
       onTyping: (sessionId) => setTyping(sessionId, true),
       onMessage: (content, sessionId) => { addMessage('assistant', content, sessionId); setTyping(sessionId, false); },
       onSync: (role, content) => addMessage(role, content),
+      onProgress: (text, sessionId) => addProgress(sessionId, text),
+      onNotice: (content, sessionId) => addMessage('assistant', content, sessionId),
       onError: (msg) => { addMessage('assistant', `[error] ${msg}`); setTyping(null, false); },
       onSessionId: setSessionId,
     });
@@ -42,7 +44,8 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Chat stays mounted so messages are never lost on panel switch */}
         <div className={activePanel === 'chat' ? 'flex flex-col flex-1 min-h-0' : 'hidden'}>
-          <Chat onSend={sendMessage} typing={typingSessions.includes(activeSessionId)} />
+          <Chat onSend={sendMessage} typing={typingSessions.includes(activeSessionId)}
+                progress={progressBySession[activeSessionId] ?? []} />
         </div>
         {activePanel === 'control' && <ControlPanel />}
         {activePanel === 'agents' && <AgentsPanel />}

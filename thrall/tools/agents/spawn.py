@@ -22,7 +22,7 @@ async def execute(call: ToolCall) -> ToolResult:
     if not brief:
         return _result(call.id, error="brief is required", start=start)
 
-    # Check if profile matches a named agent in the catalog
+    # Check if profile matches a named built-in or catalog agent.
     soul_override: str | None = None
     if profile_name and profile_name != "default":
         from components.agents.utils import load_agent
@@ -64,12 +64,13 @@ async def execute(call: ToolCall) -> ToolResult:
         profile=profile,
         soul_override=soul_override,
         silent=not notify,
+        session_id=call.session_id,
     )
 
     from thrall.tasks.pool import submit
     await submit(task)
 
-    source = f" (loaded from catalog: {profile_name})" if soul_override else ""
+    source = f" (loaded named agent: {profile_name})" if soul_override else ""
     return _result(call.id, output=f"agent spawned: {task.id}{source}\nBrief: {brief[:80]}", start=start)
 
 
@@ -78,7 +79,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
 
 
 NAME = "agents_spawn"
-DESCRIPTION = "Spawn an autonomous agent to work on a task in parallel. Use profile=<agent-name> to spawn a named agent from the catalog. Returns task_id — use agents.result to collect output."
+DESCRIPTION = "Spawn an autonomous agent to work on a task in parallel. Use profile=<agent-name> to spawn a named built-in or catalog agent. Returns task_id — use agents.result to collect output."
 PARAMETERS = {
     "brief": {"type": "string", "required": True},
     "profile": {"type": "string", "required": False, "default": "default"},

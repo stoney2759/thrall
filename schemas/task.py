@@ -42,3 +42,4 @@ class Task(BaseModel):
     error: str | None = None
     soul_override: str | None = None  # catalog agent system prompt, overrides default
     silent: bool = False  # if True, suppress Telegram delivery notification on completion
+    session_id: UUID | None = None  # session that started the task — its result is handed back to Thrall there

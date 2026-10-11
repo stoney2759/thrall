@@ -2,31 +2,56 @@ from __future__ import annotations
 import asyncio
 import os
 import uuid
-from datetime import datetime, timezone
+import tempfile
+from dataclasses import dataclass, field
 
-from telegram import Update, BotCommand
+from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatAction, ParseMode
+from telegram.error import TimedOut as TelegramTimedOut
 from telegram.ext import (
     Application,
     CommandHandler,
+    CallbackQueryHandler,
     MessageHandler,
     ContextTypes,
     filters,
 )
-import tempfile
-import os
 
 from schemas.message import Message, Role, Transport
 from thrall.coordinator import receive
 from transports.telegram import auth
-from services import session_memory
 from bootstrap import state
-from constants.telegram import TG_MAX_LENGTH
+from constants.telegram import TG_MAX_LENGTH, TG_MEDIA_GROUP_DELAY_SECONDS, TG_CHOICE_PREFIX
+from constants.permissions import PERMISSION_CHOICE_LABELS
 
 
 # ── Bot reference (for proactive sends from other transports) ─────────────────
 
 _app: Application | None = None
+
+
+@dataclass
+class _MediaGroupItem:
+    update_id: int
+    kind: str
+    file_id: str
+    media_type: str
+    filename: str
+    caption: str
+
+
+@dataclass
+class _MediaGroup:
+    chat_id: int
+    user_id: str
+    session_id: uuid.UUID
+    bot: object
+    items: list[_MediaGroupItem] = field(default_factory=list)
+    flush_task: asyncio.Task | None = None
+
+
+_media_groups: dict[tuple[int, str], _MediaGroup] = {}
+_media_group_lock = asyncio.Lock()
 
 
 async def send_to_primary_user(text: str) -> None:
@@ -44,6 +69,68 @@ async def send_to_primary_user(text: str) -> None:
             pass
 
 
+_choice_prompts: dict[uuid.UUID, object] = {}  # session -> last question message sent with buttons
+
+
+def _register_choice_ui(bot, chat_id: int, session_id: uuid.UUID) -> None:
+    """Questions with choices (permission prompts) get tap buttons; once answered the message is
+    edited to a one-line record of the outcome (buttons removed)."""
+    from services import ask_user_channel
+
+    async def show(question: str, choices: list[str]) -> None:
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton(PERMISSION_CHOICE_LABELS.get(c, c), callback_data=f"{TG_CHOICE_PREFIX}{c}")
+            for c in choices
+        ]])
+        _choice_prompts[session_id] = await bot.send_message(chat_id=chat_id, text=question, reply_markup=keyboard)
+
+    async def resolve(outcome: str) -> None:
+        prompt = _choice_prompts.pop(session_id, None)
+        if prompt is not None:
+            await bot.edit_message_text(chat_id=chat_id, message_id=prompt.message_id, text=outcome, reply_markup=None)
+
+    ask_user_channel.register_choice_ui(session_id, show, resolve)
+
+
+async def handle_choice_tap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """A tap on a question button — delivered exactly like a typed answer."""
+    from services import ask_user_channel
+    query = update.callback_query
+    if not _is_allowed(update):
+        await query.answer()
+        return
+    session = _session_id(update.effective_user.id)
+    if ask_user_channel.has_pending(session):
+        ask_user_channel.deliver_reply(session, query.data[len(TG_CHOICE_PREFIX):])
+        await query.answer()
+    else:
+        await query.answer("That question has already been answered or expired.")
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+
+
+async def _receive_with_progress(bot, chat_id: int, message: Message) -> str:
+    """receive() with a live "⏳ Working…" status message, edited as steps happen and removed at the end.
+    A message sent while a task is already running is just queued — the running task's board stays."""
+    from services import progress
+    if state.has_active_task(str(message.session_id)):
+        return await receive(message)
+    board = progress.StatusBoard(
+        send=lambda text: bot.send_message(chat_id=chat_id, text=text),
+        edit=lambda handle, text: bot.edit_message_text(chat_id=chat_id, message_id=handle.message_id, text=text),
+        delete=lambda handle: bot.delete_message(chat_id=chat_id, message_id=handle.message_id),
+    )
+    listener = board.add
+    progress.register(message.session_id, listener)
+    try:
+        return await receive(message)
+    finally:
+        progress.unregister(message.session_id, listener)
+        await board.close()
+
+
 # ── Session ID ────────────────────────────────────────────────────────────────
 
 def _session_id(user_id: int) -> uuid.UUID:
@@ -57,7 +144,17 @@ async def _send(update: Update, text: str) -> None:
     """Split and send long responses within Telegram's 4096 char limit."""
     chunks = [text[i:i + TG_MAX_LENGTH] for i in range(0, len(text), TG_MAX_LENGTH)]
     for chunk in chunks:
-        await update.message.reply_text(chunk)
+        try:
+            await update.message.reply_text(chunk)
+        except TelegramTimedOut:
+            await asyncio.sleep(3)
+            await update.message.reply_text(chunk)
+
+
+async def _send_to_chat(bot, chat_id: int, text: str) -> None:
+    chunks = [text[i:i + TG_MAX_LENGTH] for i in range(0, len(text), TG_MAX_LENGTH)]
+    for chunk in chunks:
+        await bot.send_message(chat_id=chat_id, text=chunk)
 
 
 def _build_message(update: Update) -> Message:
@@ -97,7 +194,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user_id=str(user.id),
         session_id=_session_id(user.id),
         transport=Transport.TELEGRAM,
-        args=[],
+        args=list(context.args or []),
     )
     response = await dispatch("help", ctx)
     await update.message.reply_text(response or "No commands found.")
@@ -106,38 +203,55 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_allowed(update):
         return
-    uptime = datetime.now(timezone.utc) - datetime.fromisoformat(
-        state.get_config().get("thrall", {}).get("started_at", datetime.now(timezone.utc).isoformat())
-    )
-    lines = [
-        f"*Thrall Status*",
-        f"Active tasks: {state.get_active_task_count()}",
-        f"Total cost: ${state.get_total_cost():.4f}",
-        f"Session: {_session_id(update.effective_user.id)}",
-        f"Provider: {state.get_config().get('llm', {}).get('provider', 'unknown')}",
-        f"Model: {state.get_model_override() or state.get_config().get('llm', {}).get('model', 'unknown')}",
-    ]
-    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(user_id=str(user.id), session_id=_session_id(user.id), transport=Transport.TELEGRAM, args=[])
+    response = await dispatch("status", ctx)
+    await update.message.reply_text(response or "OK")
 
 
 async def cmd_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_allowed(update):
         return
+    from commands.base import CommandContext
+    from commands.registry import dispatch
     user = update.effective_user
-    session_memory.clear(_session_id(user.id))
-    await update.message.reply_text("Session memory cleared.")
+    ctx = CommandContext(user_id=str(user.id), session_id=_session_id(user.id), transport=Transport.TELEGRAM, args=[])
+    response = await dispatch("clear", ctx)
+    await update.message.reply_text(response or "Done.")
 
 
 async def cmd_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_allowed(update):
         return
-    if not context.args:
-        current = state.get_model_override() or state.get_config().get("llm", {}).get("model", "unknown")
-        await update.message.reply_text(f"Current model: `{current}`\n\nUsage: /model <model-name>", parse_mode=ParseMode.MARKDOWN)
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(
+        user_id=str(user.id),
+        session_id=_session_id(user.id),
+        transport=Transport.TELEGRAM,
+        args=list(context.args or []),
+    )
+    response = await dispatch("model", ctx)
+    await update.message.reply_text(response or "Done.")
+
+
+async def cmd_auth(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_allowed(update):
         return
-    model = context.args[0]
-    state.set_model_override(model)
-    await update.message.reply_text(f"Model switched to: `{model}`", parse_mode=ParseMode.MARKDOWN)
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(
+        user_id=str(user.id),
+        session_id=_session_id(user.id),
+        transport=Transport.TELEGRAM,
+        args=list(context.args or []),
+    )
+    response = await dispatch("auth", ctx)
+    await update.message.reply_text(response or "Done.")
 
 
 async def cmd_memory(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -159,9 +273,12 @@ async def cmd_memory(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 async def cmd_restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_allowed(update):
         return
-    from bootstrap.startup import reload
+    from commands.base import CommandContext
+    from commands.registry import dispatch
     from scheduler import runner
-    reload()
+    user = update.effective_user
+    ctx = CommandContext(user_id=str(user.id), session_id=_session_id(user.id), transport=Transport.TELEGRAM, args=[])
+    await dispatch("restart", ctx)
     runner.set_bot(context.bot)
     allowed: list = state.get_config().get("transports", {}).get("telegram", {}).get("allowed_user_ids", [])
     for uid in allowed:
@@ -263,25 +380,46 @@ async def cmd_cron(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_allowed(update):
         return
-    from thrall.tasks import pool
-    active = pool.list_active()
-    if not active:
-        await update.message.reply_text("No active tasks.")
-        return
-    lines = [f"*Active Tasks* ({len(active)})"]
-    for task in active:
-        lines.append(f"• `{task.id}` [{task.type.value}] {task.status.value}\n  {task.brief[:60]}...")
-    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(user_id=str(user.id), session_id=_session_id(user.id), transport=Transport.TELEGRAM, args=[])
+    response = await dispatch("tasks", ctx)
+    await update.message.reply_text(response or "No active tasks.")
 
 
 async def cmd_cost(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_allowed(update):
         return
-    usage = state.get_model_usage()
-    lines = [f"*Token Usage*\nTotal cost: ${state.get_total_cost():.4f}\n"]
-    for model, u in usage.items():
-        lines.append(f"`{model}`\n  In: {u.input_tokens:,}  Out: {u.output_tokens:,}  Cost: ${u.cost_usd:.4f}")
-    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(user_id=str(user.id), session_id=_session_id(user.id), transport=Transport.TELEGRAM, args=[])
+    response = await dispatch("cost", ctx)
+    await update.message.reply_text(response or "No usage data.", parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_permissions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_allowed(update):
+        return
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(user_id=str(user.id), session_id=_session_id(user.id), transport=Transport.TELEGRAM,
+                         args=list(context.args or []))
+    response = await dispatch("permissions", ctx)
+    await update.message.reply_text(response or "Unavailable.")
+
+
+async def cmd_tokens(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _is_allowed(update):
+        return
+    from commands.base import CommandContext
+    from commands.registry import dispatch
+    user = update.effective_user
+    ctx = CommandContext(user_id=str(user.id), session_id=_session_id(user.id), transport=Transport.TELEGRAM, args=[])
+    response = await dispatch("tokens", ctx)
+    await update.message.reply_text(response or "No token data.", parse_mode=ParseMode.MARKDOWN)
 
 
 # ── Voice mode state ──────────────────────────────────────────────────────────
@@ -351,7 +489,7 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user_id=str(user.id),
         session_id=_session_id(user.id),
         transport=Transport.TELEGRAM,
-        args=[],
+        args=list(context.args or []),
     )
     response = await dispatch("stop", ctx)
     await update.message.reply_text(response or "Done.")
@@ -447,6 +585,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await context.bot.send_message(chat_id=chat_id, text=text)
 
     ask_user_channel.register_sender(session_id, _send_to_user)
+    _register_choice_ui(context.bot, chat_id, session_id)
 
     # If a tool is waiting for user input, deliver the reply directly and stop
     if ask_user_channel.has_pending(session_id):
@@ -457,24 +596,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     message = _build_message(update)
 
+    response: str | None = None
     try:
-        response = await receive(message)
+        response = await _receive_with_progress(update.get_bot(), update.effective_chat.id, message)
         use_audio = uid in _voice_mode or _wants_audio(user_text)
         if use_audio:
             await _send_audio(update, response)
         else:
             await _send(update, response)
-        # Mirror conversation to webapp
-        try:
-            from transports.desktop.manager import sync_message
-            await sync_message("user", user_text)
-            await sync_message("assistant", response)
-        except Exception:
-            pass
+        # Mirror conversation to webapp (API server is a separate process — local HTTP)
+        from services.transport_sync import push_to_webapp
+        if await push_to_webapp("user", user_text):
+            await push_to_webapp("assistant", response)
     except Exception as e:
         import traceback
         state.log_error(f"Telegram handler error: {e}\n{traceback.format_exc()}")
-        await update.message.reply_text(f"Error: {e}")
+        if response is not None:
+            # Coordinator finished — delivery failed; retry once with plain text
+            try:
+                await update.message.reply_text(response[:TG_MAX_LENGTH])
+            except Exception:
+                pass
+        else:
+            await update.message.reply_text(f"Error: {e}")
 
 
 # ── Voice handler ─────────────────────────────────────────────────────────────
@@ -494,6 +638,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await context.bot.send_message(chat_id=_chat_id, text=text)
 
     ask_user_channel.register_sender(_session, _send_to_user)
+    _register_choice_ui(context.bot, _chat_id, _session)
 
     await update.message.chat.send_action(ChatAction.TYPING)
 
@@ -524,7 +669,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             transport=Transport.TELEGRAM,
             user_id=str(update.effective_user.id),
         )
-        response = await receive(message)
+        response = await _receive_with_progress(update.get_bot(), update.effective_chat.id, message)
         # Voice in → voice out always
         await _send_audio(update, response)
 
@@ -543,6 +688,129 @@ def _uploads_dir():
     return d
 
 
+def _unique_upload_path(filename: str):
+    save_path = _uploads_dir() / filename
+    if save_path.exists():
+        stem, suffix = save_path.stem, save_path.suffix
+        counter = 1
+        while save_path.exists():
+            save_path = _uploads_dir() / f"{stem}_{counter}{suffix}"
+            counter += 1
+    return save_path
+
+
+def _document_supported(filename: str, mime: str) -> bool:
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+    return (
+        ext in ("pdf", "docx", "txt", "csv", "xlsx")
+        or "pdf" in mime
+        or "wordprocessingml" in mime
+        or "text/plain" in mime
+        or "text/csv" in mime
+        or "spreadsheetml" in mime
+    )
+
+
+async def _register_ask_sender(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from services import ask_user_channel
+    session = _session_id(update.effective_user.id)
+    chat_id = update.effective_chat.id
+
+    async def _send_to_user(text: str) -> None:
+        await context.bot.send_message(chat_id=chat_id, text=text)
+
+    ask_user_channel.register_sender(session, _send_to_user)
+    _register_choice_ui(context.bot, chat_id, session)
+
+
+async def _enqueue_media_group(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    item: _MediaGroupItem,
+) -> None:
+    key = (update.effective_chat.id, update.message.media_group_id)
+    async with _media_group_lock:
+        group = _media_groups.get(key)
+        if group is None:
+            group = _MediaGroup(
+                chat_id=update.effective_chat.id,
+                user_id=str(update.effective_user.id),
+                session_id=_session_id(update.effective_user.id),
+                bot=context.bot,
+            )
+            _media_groups[key] = group
+
+        group.items.append(item)
+        if group.flush_task and not group.flush_task.done():
+            group.flush_task.cancel()
+        group.flush_task = asyncio.create_task(_flush_media_group_after_delay(key))
+
+
+async def _flush_media_group_after_delay(key: tuple[int, str]) -> None:
+    try:
+        await asyncio.sleep(TG_MEDIA_GROUP_DELAY_SECONDS)
+    except asyncio.CancelledError:
+        return
+
+    async with _media_group_lock:
+        group = _media_groups.pop(key, None)
+
+    if group is None:
+        return
+
+    await _process_media_group(group)
+
+
+async def _process_media_group(group: _MediaGroup) -> None:
+    try:
+        await group.bot.send_chat_action(chat_id=group.chat_id, action=ChatAction.TYPING)
+        lines: list[str] = [f"[Telegram media group: {len(group.items)} item(s)]"]
+
+        for index, item in enumerate(sorted(group.items, key=lambda x: x.update_id), start=1):
+            if item.kind == "image":
+                lines.extend(await _describe_media_group_image(group.bot, item, index))
+            else:
+                lines.extend(await _save_media_group_document(group.bot, item, index))
+
+        message = Message(
+            session_id=group.session_id,
+            role=Role.USER,
+            content="\n".join(lines),
+            transport=Transport.TELEGRAM,
+            user_id=group.user_id,
+        )
+        response = await _receive_with_progress(group.bot, group.chat_id, message)
+        await _send_to_chat(group.bot, group.chat_id, response)
+    except Exception as e:
+        state.log_error(f"Telegram media group handler error: {e}")
+        await _send_to_chat(group.bot, group.chat_id, f"Media group handling failed: {e}")
+
+
+async def _describe_media_group_image(bot, item: _MediaGroupItem, index: int) -> list[str]:
+    tg_file = await bot.get_file(item.file_id)
+    image_bytes = await tg_file.download_as_bytearray()
+
+    from services.vision.openai import describe
+    description = await describe(bytes(image_bytes), media_type=item.media_type)
+
+    lines = [f"\n[Image {index}]", description or "Could not analyse image."]
+    if item.caption:
+        lines.append(f"User note: {item.caption}")
+    return lines
+
+
+async def _save_media_group_document(bot, item: _MediaGroupItem, index: int) -> list[str]:
+    tg_file = await bot.get_file(item.file_id)
+    file_bytes = await tg_file.download_as_bytearray()
+    save_path = _unique_upload_path(item.filename)
+    save_path.write_bytes(bytes(file_bytes))
+
+    lines = [f"\n[Uploaded file {index}: {item.filename}]", f"Path: {save_path}"]
+    if item.caption:
+        lines.append(f"User note: {item.caption}")
+    return lines
+
+
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
@@ -550,14 +818,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text("Unauthorised.")
         return
 
-    from services import ask_user_channel
-    _session = _session_id(update.effective_user.id)
-    _chat_id = update.effective_chat.id
-
-    async def _send_to_user(text: str) -> None:
-        await context.bot.send_message(chat_id=_chat_id, text=text)
-
-    ask_user_channel.register_sender(_session, _send_to_user)
+    await _register_ask_sender(update, context)
 
     doc = update.message.document
     if not doc:
@@ -565,11 +826,24 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     mime = doc.mime_type or ""
     filename = doc.file_name or "file"
-    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
 
-    supported = ext in ("pdf", "docx", "txt") or "pdf" in mime or "wordprocessingml" in mime or "text/plain" in mime
-    if not supported:
-        await update.message.reply_text(f"Unsupported file type: {mime or filename}\nSupported: pdf, docx, txt")
+    if not _document_supported(filename, mime):
+        await update.message.reply_text(f"Unsupported file type: {mime or filename}\nSupported: pdf, docx, txt, csv, xlsx")
+        return
+
+    if update.message.media_group_id:
+        await _enqueue_media_group(
+            update,
+            context,
+            _MediaGroupItem(
+                update_id=update.update_id,
+                kind="document",
+                file_id=doc.file_id,
+                media_type=mime,
+                filename=filename,
+                caption=(update.message.caption or "").strip(),
+            ),
+        )
         return
 
     await update.message.chat.send_action(ChatAction.TYPING)
@@ -578,14 +852,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         tg_file = await context.bot.get_file(doc.file_id)
         file_bytes = await tg_file.download_as_bytearray()
 
-        save_path = _uploads_dir() / filename
-        if save_path.exists():
-            stem, suffix = save_path.stem, save_path.suffix
-            counter = 1
-            while save_path.exists():
-                save_path = _uploads_dir() / f"{stem}_{counter}{suffix}"
-                counter += 1
-
+        save_path = _unique_upload_path(filename)
         save_path.write_bytes(bytes(file_bytes))
 
         caption = (update.message.caption or "").strip()
@@ -600,7 +867,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             transport=Transport.TELEGRAM,
             user_id=str(update.effective_user.id),
         )
-        response = await receive(message)
+        response = await _receive_with_progress(update.get_bot(), update.effective_chat.id, message)
         await _send(update, response)
 
     except Exception as e:
@@ -617,14 +884,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Unauthorised.")
         return
 
-    from services import ask_user_channel
-    _session = _session_id(update.effective_user.id)
-    _chat_id = update.effective_chat.id
-
-    async def _send_to_user(text: str) -> None:
-        await context.bot.send_message(chat_id=_chat_id, text=text)
-
-    ask_user_channel.register_sender(_session, _send_to_user)
+    await _register_ask_sender(update, context)
 
     await update.message.chat.send_action(ChatAction.TYPING)
 
@@ -632,11 +892,28 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         if update.message.photo:
             photo = update.message.photo[-1]
             media_type = "image/jpeg"
+            filename = "image.jpg"
         elif update.message.document and (update.message.document.mime_type or "").startswith("image/"):
             photo = update.message.document
             media_type = update.message.document.mime_type or "image/jpeg"
+            filename = update.message.document.file_name or "image"
         else:
             await update.message.reply_text("No image found in message.")
+            return
+
+        if update.message.media_group_id:
+            await _enqueue_media_group(
+                update,
+                context,
+                _MediaGroupItem(
+                    update_id=update.update_id,
+                    kind="image",
+                    file_id=photo.file_id,
+                    media_type=media_type,
+                    filename=filename,
+                    caption=(update.message.caption or "").strip(),
+                ),
+            )
             return
 
         tg_file = await context.bot.get_file(photo.file_id)
@@ -661,7 +938,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             transport=Transport.TELEGRAM,
             user_id=str(update.effective_user.id),
         )
-        response = await receive(message)
+        response = await _receive_with_progress(update.get_bot(), update.effective_chat.id, message)
         await _send(update, response)
 
     except Exception as e:
@@ -711,6 +988,10 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("stop", cmd_stop))
     app.add_handler(CommandHandler("approve", cmd_approve))
     app.add_handler(CommandHandler("watch", cmd_watch))
+    app.add_handler(CommandHandler("auth", cmd_auth))
+    app.add_handler(CommandHandler("tokens", cmd_tokens))
+    app.add_handler(CommandHandler("permissions", cmd_permissions))
+    app.add_handler(CallbackQueryHandler(handle_choice_tap, pattern=f"^{TG_CHOICE_PREFIX}"))
 
     # Voice and audio messages
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
@@ -731,20 +1012,9 @@ def build_application() -> Application:
 
 
 async def _start_mcp() -> None:
-    try:
-        from services.mcp.manager import MCPClientManager
-        from services.mcp import executor as mcp_executor
-        from thrall.tools import registry as tools
-        mcp_config = state.get_config().get("mcp", {})
-        manager = MCPClientManager()
-        await manager.connect_all(mcp_config)
-        mcp_executor.set_manager(manager)
-        mcp_tools = manager.all_tools()
-        if mcp_tools:
-            tools.register_mcp_tools(mcp_tools)
-            state.log_error(f"MCP: registered {len(mcp_tools)} tools from {manager.available_servers()}")
-    except Exception as e:
-        state.log_error(f"MCP startup error: {e}")
+    # Shared with the API server — when both run in one process MCP connects only once
+    from services.mcp import lifecycle as mcp_lifecycle
+    await mcp_lifecycle.start()
 
 
 async def _register_task_delivery(app: Application) -> None:
@@ -752,14 +1022,25 @@ async def _register_task_delivery(app: Application) -> None:
 
     async def _deliver(task) -> None:
         from schemas.task import TaskStatus
+        from schemas.message import Transport
+        from services import background_wake
         if getattr(task, "silent", False):
             return
+        if task.status == TaskStatus.DONE and task.result and task.profile and task.profile.name and task.profile.name != "default":
+            from thrall.tasks.continuation_store import save
+            save(task.profile.name, task.brief, task.result)
+        # Hand the result to Thrall so it reasons and replies; raw post below is the fallback
+        if background_wake.should_wake(task) and allowed:
+            try:
+                reply = await background_wake.wake(task, Transport.TELEGRAM, str(allowed[0]))
+                if reply:
+                    await _send_to_chat(app.bot, allowed[0], reply)
+                return
+            except Exception as e:
+                state.log_error(f"Background wake failed for task {task.id}: {type(e).__name__}: {e}")
         if task.status == TaskStatus.DONE:
             result = task.result or "(agent completed but returned no output)"
             text = f"Agent task complete:\n\n{result}"
-            if task.result and task.profile and task.profile.name and task.profile.name != "default":
-                from thrall.tasks.continuation_store import save
-                save(task.profile.name, task.brief, task.result)
         elif task.status == TaskStatus.FAILED:
             text = f"Agent task failed:\n\n{task.error or '(no error details)'}"
         else:
@@ -797,9 +1078,11 @@ async def set_commands(app: Application) -> None:
         BotCommand("compact_cancel", "Discard compact draft"),
         BotCommand("profile", "Show or switch personality profile: /profile [name]"),
         BotCommand("voice", "Toggle voice mode on/off"),
-        BotCommand("stop", "Cancel the currently running task"),
+        BotCommand("stop", "Cancel the current task or /stop <task_id>"),
         BotCommand("approve", "Approve a pending proposal and execute"),
         BotCommand("watch", "Process a video: download, transcribe, extract frames, store in memory"),
+        BotCommand("tokens", "Show token usage, context size, and cost for the current session"),
+        BotCommand("permissions", "Permission mode: ask, trusted, read_only"),
     ])
     from scheduler import runner
     runner.start(app.bot)

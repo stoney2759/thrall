@@ -5,6 +5,8 @@ type InboundFrame =
   | { type: 'typing'; session_id?: string }
   | { type: 'response'; content: string; reasoning: string | null; session_id?: string }
   | { type: 'sync'; role: 'user' | 'assistant'; content: string }
+  | { type: 'progress'; text: string; session_id?: string }
+  | { type: 'notice'; content: string; session_id?: string }
   | { type: 'pong' }
   | { type: 'error'; message: string };
 
@@ -13,6 +15,10 @@ export interface WsCallbacks {
   onTyping: (sessionId: string | null) => void;
   onMessage: (content: string, sessionId: string | null) => void;
   onSync: (role: 'user' | 'assistant', content: string) => void;
+  /** A live step while Thrall works ("deckcraft: add slide"). */
+  onProgress: (text: string, sessionId: string | null) => void;
+  /** A message that doesn't end the task (permission question, "got it" for a mid-task message). */
+  onNotice: (content: string, sessionId: string | null) => void;
   onError: (msg: string) => void;
   onSessionId: (id: string) => void;
 }
@@ -61,6 +67,10 @@ export function createWsClient(token: string, callbacks: WsCallbacks): WsClient 
         callbacks.onStatus('ready');
       } else if (frame.type === 'sync') {
         callbacks.onSync(frame.role, frame.content);
+      } else if (frame.type === 'progress') {
+        callbacks.onProgress(frame.text, frame.session_id ?? null);
+      } else if (frame.type === 'notice') {
+        callbacks.onNotice(frame.content, frame.session_id ?? null);
       } else if (frame.type === 'error') {
         callbacks.onError(frame.message);
         callbacks.onStatus('ready');

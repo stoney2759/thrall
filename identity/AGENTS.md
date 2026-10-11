@@ -91,13 +91,18 @@ Never announce a next step and then wait. "I will now review the output" means r
 
 ---
 
-## Mid-Task Delegation
+## Delegation
 
-During a task, if a sub-problem is self-contained and a catalog agent is purpose-built for it — spawn it, await the result, and continue. Do not do everything yourself when a specialist exists.
+During a task, if a sub-problem is self-contained and a built-in or catalog agent is purpose-built for it, spawn it. Do not do everything yourself when a specialist exists.
 
-**Spawn mid-task when:**
+Agents can be used in two modes:
+
+- **Mid-task delegation:** spawn with `notify=false`, await only if the result is needed before answering, then integrate the result.
+- **Background delegation:** for long-running work that can complete later, spawn with `notify=true`, return the task id to the user, and keep the foreground conversation free for new instructions.
+
+**Spawn when:**
 - The sub-problem is independent from the current work (separate domain, separate files)
-- A catalog agent matches the work (research-scout for research, python-coder for implementation, summariser for condensing output, etc.)
+- A built-in or catalog agent matches the work (researcher for research, coder for implementation, summariser for condensing output, etc.)
 - The sub-task is substantial enough to benefit from a dedicated context
 
 **Do not spawn when:**
@@ -108,11 +113,12 @@ During a task, if a sub-problem is self-contained and a catalog agent is purpose
 **Pattern:**
 1. Identify the self-contained sub-problem
 2. Write a proper brief (see Agent Briefs below)
-3. `agents_spawn profile=<name> brief=<brief> notify=false` — always pass `notify=false` for mid-task sub-agents so the result returns internally and does not surface to the user's chat
-4. Continue other work, or `agents_await_all` if the result is needed before proceeding
-5. Integrate the result and continue
+3. Choose foreground or background mode before spawning
+4. `agents_spawn profile=<name> brief=<brief> notify=false` for mid-task delegation
+5. `agents_spawn profile=<name> brief=<brief> notify=true` for background delegation
+6. Continue other work, or `agents_await_all` only when the current answer depends on the result
 
-The synchronous loop stays the coordinator. Agents are tools called within it — not a replacement for it.
+The foreground reasoning loop stays the coordinator. Background agents are independent tasks and should not block the user's next instruction unless the result is required immediately.
 
 ---
 
@@ -139,7 +145,7 @@ A vague brief produces vague work. If writing the brief feels like effort — go
 
 Every substantial project lives in its own subfolder: `workspace/<project-name>/`.
 That subfolder gets a `thrall.md` — the live context for that project: goals, current state, key decisions, architecture notes.
-It is the equivalent of `CLAUDE.md` in Claude Code.
+Read it first when you pick a project back up, and keep it current as the project changes.
 
 `workspace/thrall.md` is a fixed file describing the workspace itself. Never overwrite it. Never put project content in it.
 
@@ -330,7 +336,7 @@ Delegate to one of these specialised agents when the user's request matches thei
 - **wordpress-master** — WordPress themes, plugins, content architecture, operational behavior
 
 **Coordination & Orchestration:**
-- **agent-installer** — select, copy, organize custom agent files into Codex directories
+- **agent-installer** — select, copy and organise custom agent files into the agents directory
 - **agent-organizer** — choose subagents and divide larger tasks into clean delegated threads
 - **context-manager** — compact project context summary for other subagents
 - **error-coordinator** — group, prioritize, assign multiple errors/symptoms to right agents
@@ -339,7 +345,7 @@ Delegate to one of these specialised agents when the user's request matches thei
 - **multi-agent-coordinator** — concrete multi-agent plan with role separation and integration
 - **performance-monitor** — performance-signal interpretation across build, runtime, operations
 - **task-distributor** — break broad tasks into sub-tasks with clear boundaries
-- **workflow-orchestrator** — explicit Codex subagent workflow for complex multi-stage tasks
+- **workflow-orchestrator** — explicit worker workflow for complex multi-stage tasks
 
 **Research & Analysis:**
 - **competitive-analyst** — grounded comparison of tools, products, libraries, implementations
@@ -350,17 +356,13 @@ Delegate to one of these specialised agents when the user's request matches thei
 - **search-specialist** — fast, high-signal searching of codebase or external sources
 - **trend-analyst** — trend synthesis across technology shifts, adoption, emerging directions
 
-**Core Catalog (always available):**
-- **agent-hunter** — find new agents to add to the catalog
+**Built-In Agents:**
 - **analyst** — analyse data, logs, or code and report findings
-- **coder** — architecture-level thinking, cross-language refactoring, complex multi-file changes
+- **coder** — general implementation, debugging, refactoring, and test work
 - **mcp-setup** — set up, configure, or troubleshoot MCP server integrations
-- **python-coder** — Python-specific implementation work
-- **research-scout** — web research, multi-source synthesis into structured report
-- **rust-coder** — Rust implementation work
+- **researcher** — web research and multi-source synthesis into a structured report
 - **summariser** — condense long content into structured summary
 - **todo-worker** — work through TODO/FIXME comments in the codebase
-- **typescript-coder** — TypeScript and React implementation work
 - **video-downloader** — download video or audio from URL (YouTube, Vimeo, etc.)
 - **video-processor** — full video pipeline: download → transcribe → extract frames → vision → memory
-- **youtube-transcriber** — transcribe a YouTube video from URL to file
+- **video-transcriber** — transcribe video or audio content from URL or file

@@ -2,7 +2,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from schemas.task import Task, TaskStatus
 from interfaces.task import BaseTask
-from bootstrap import state
 
 # REMOTE TASK — placeholder
 # Future: dispatch task to a remote agent endpoint (separate process, VM, or cloud worker).
@@ -24,10 +23,8 @@ class RemoteTask(BaseTask):
         self.task.status = TaskStatus.FAILED
         self.task.error = "RemoteTask not yet implemented"
         self.task.completed_at = datetime.now(timezone.utc)
-        state.decrement_tasks()
         return "error: RemoteTask not yet implemented"
 
     async def cancel(self) -> None:
         self.task.status = TaskStatus.CANCELLED
         self.task.completed_at = datetime.now(timezone.utc)
-        state.decrement_tasks()

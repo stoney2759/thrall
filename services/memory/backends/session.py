@@ -34,8 +34,10 @@ class SessionBackend(MemoryBackend):
         return matches[-limit:]
 
     async def search_episodes(self, query: str, limit: int) -> list[Episode]:
-        q = query.lower()
-        matches = [e for e in self._episodes if q in e.content.lower()]
+        keywords = self._query_keywords(query)
+        if not keywords:
+            return self._episodes[-limit:]
+        matches = [e for e in self._episodes if any(kw in e.content.lower() for kw in keywords)]
         return matches[-limit:]
 
     # ── Knowledge ─────────────────────────────────────────────────────────────
@@ -44,9 +46,14 @@ class SessionBackend(MemoryBackend):
         self._facts.append(fact)
 
     async def search_facts(self, query: str, limit: int) -> list[KnowledgeFact]:
-        q = query.lower()
-        matches = [f for f in self._facts if q in f.content.lower()]
+        keywords = self._query_keywords(query)
+        if not keywords:
+            return self._facts[-limit:]
+        matches = [f for f in self._facts if any(kw in f.content.lower() for kw in keywords)]
         return matches[-limit:]
+
+    async def list_facts(self, limit: int) -> list[KnowledgeFact]:
+        return self._facts[-limit:]
 
     async def delete_fact(self, fact_id: UUID) -> None:
         self._facts = [f for f in self._facts if f.id != fact_id]
