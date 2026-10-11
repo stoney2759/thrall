@@ -37,6 +37,14 @@ BANNER = (
 )
 TAGLINE = "  Thrall 2.0"
 
+# Setup messages — shown instead of a crash when config needs the user's attention
+CONFIG_PATH = "config/config.toml"
+CONFIG_MISSING_MSG = "config/config.toml not found — copy config/config.example.toml to config/config.toml first."
+CONFIG_INVALID_MSG = "config/config.toml has a mistake Thrall can't read: {error}"
+CONFIG_INVALID_HINT = "Fix that line (text values need quotes, lists look like [123, 456]) and start again."
+TELEGRAM_NO_USERS_MSG = ("Telegram has no allowed users yet — add your Telegram user id to allowed_user_ids "
+                         "under [transports.telegram] in config/config.toml (message @userinfobot to get it).")
+
 # ANSI colours (same palette as the old start.ps1)
 COLOURS = {
     "dark_magenta": "\033[35m", "magenta": "\033[95m", "dark_gray": "\033[90m", "white": "\033[97m",

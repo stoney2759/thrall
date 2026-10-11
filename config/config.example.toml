@@ -51,7 +51,9 @@ tier_lightweight = "google/gemini-2.0-flash-lite"
 
 [transports.telegram]
 enabled = true
-allowed_user_ids = [YOUR_TELEGRAM_USER_ID]
+# Your Telegram user id (a number — message @userinfobot on Telegram to get it), e.g. [123456789].
+# Empty = nobody can use the bot; Thrall starts without Telegram and tells you to add it.
+allowed_user_ids = []
 
 [transports.cli]
 enabled = true

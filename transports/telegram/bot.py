@@ -54,21 +54,6 @@ _media_groups: dict[tuple[int, str], _MediaGroup] = {}
 _media_group_lock = asyncio.Lock()
 
 
-async def send_to_primary_user(text: str) -> None:
-    """Send a message to the primary Telegram user. Used by webapp transport for bidirectional sync."""
-    if _app is None:
-        return
-    allowed: list = state.get_config().get("transports", {}).get("telegram", {}).get("allowed_user_ids", [])
-    if not allowed:
-        return
-    chunks = [text[i:i + TG_MAX_LENGTH] for i in range(0, len(text), TG_MAX_LENGTH)]
-    for chunk in chunks:
-        try:
-            await _app.bot.send_message(chat_id=allowed[0], text=chunk)
-        except Exception:
-            pass
-
-
 _choice_prompts: dict[uuid.UUID, object] = {}  # session -> last question message sent with buttons
 
 

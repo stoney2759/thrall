@@ -28,7 +28,8 @@ sys.path.insert(0, str(ROOT))
 from constants.launcher import (  # noqa: E402 — needs ROOT on sys.path
     MODE_ALL, MODE_WEB, MODE_TELEGRAM, MODE_CLI, LAUNCH_MENU, LAUNCH_DEFAULT_KEY, LAUNCH_LOG_NAMES,
     DEFAULT_HOST, DEFAULT_PORT, DASHBOARD_DIR, DASHBOARD_BUILT_FILE, DASHBOARD_SOURCE_DIRS,
-    DASHBOARD_SOURCE_FILES, BANNER, TAGLINE, COLOURS,
+    DASHBOARD_SOURCE_FILES, BANNER, TAGLINE, COLOURS, CONFIG_PATH, CONFIG_MISSING_MSG, CONFIG_INVALID_MSG,
+    CONFIG_INVALID_HINT, TELEGRAM_NO_USERS_MSG,
 )
 
 
@@ -95,11 +96,18 @@ def ensure_venv() -> None:
 
 
 def load_config() -> dict:
-    path = ROOT / "config" / "config.toml"
+    """config.toml, or exit with a plain-English message if it is missing or unreadable."""
+    path = ROOT / CONFIG_PATH
     if not path.exists():
-        return {}
-    with open(path, "rb") as f:
-        return tomllib.load(f)
+        log(CONFIG_MISSING_MSG, "red")
+        sys.exit(1)
+    try:
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        log(CONFIG_INVALID_MSG.format(error=e), "red")
+        log(CONFIG_INVALID_HINT, "yellow")
+        sys.exit(1)
 
 
 def server_address(config: dict) -> tuple[str, int]:
@@ -142,10 +150,13 @@ def build_dashboard() -> bool:
 
 
 def telegram_ready(config: dict) -> tuple[bool, str]:
-    if not config.get("transports", {}).get("telegram", {}).get("enabled", False):
+    telegram = config.get("transports", {}).get("telegram", {})
+    if not telegram.get("enabled", False):
         return False, "Telegram is disabled in config ([transports.telegram] enabled = false)."
     if not os.environ.get("TELEGRAM_BOT_TOKEN", "").strip() and "TELEGRAM_BOT_TOKEN" not in _env_file_keys():
         return False, "TELEGRAM_BOT_TOKEN is not set (add it to .env)."
+    if not telegram.get("allowed_user_ids"):
+        return False, TELEGRAM_NO_USERS_MSG
     return True, ""
 
 
@@ -240,9 +251,6 @@ def main() -> None:
         mode = choose_mode()
 
     config = load_config()
-    if not config:
-        log("config/config.toml not found — copy config/config.example.toml to config/config.toml first.", "red")
-        sys.exit(1)
 
     web = mode in (MODE_ALL, MODE_WEB)
     telegram = mode in (MODE_ALL, MODE_TELEGRAM)
