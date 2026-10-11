@@ -10,7 +10,7 @@ Thrall is not a chatbot wrapper. It's an executive layer with memory, tools, and
 
 - **Desktop webapp** — React/Vite dashboard with concurrent isolated sessions, live over WebSocket
 - **Autonomous reasoning loop** — parallel tool execution, up to 100 iterations in approved mode
-- **55 native tools** — filesystem, web, browser automation, code execution, media, vision, memory, scheduling, clipboard, documents, notebooks, IDE diagnostics, and more
+- **61 native tools** — filesystem, web, browser automation, code execution, media, vision, memory, scheduling, clipboard, documents, notebooks, IDE diagnostics, and more
 - **14 core catalog agents** — named specialists Thrall delegates to automatically
 - **MCP integration** — connect any Model Context Protocol server (GitHub, Gmail, Google Calendar, Drive, and more)
 - **Four-layer persistent memory** — identity, session, episodic, and semantic
@@ -49,6 +49,7 @@ python -m venv venv
 venv\Scripts\activate       # Windows
 # source venv/bin/activate  # Unix
 pip install -r requirements.txt
+playwright install chromium  # browser for the browser tools
 ```
 
 ### 2. Configure
@@ -136,7 +137,7 @@ Open `http://localhost:8000` to access the webapp. Logs are in `logs/` (`thrall.
 
 ---
 
-## Tools (55)
+## Tools (61)
 
 ### Filesystem (12)
 `filesystem_read` `filesystem_write` `filesystem_edit` `filesystem_append` `filesystem_glob` `filesystem_grep` `filesystem_find` `filesystem_cat` `filesystem_ls` `filesystem_tree` `filesystem_stat` `filesystem_diff`
@@ -144,8 +145,8 @@ Open `http://localhost:8000` to access the webapp. Logs are in `logs/` (`thrall.
 ### Web (4)
 `web_fetch` `web_search` `web_scrape` `web_browse`
 
-### Browser Automation (6)
-`browser_navigate` `browser_screenshot` `browser_click` `browser_fill` `browser_extract` `browser_close`
+### Browser Automation (7)
+`browser_navigate` `browser_screenshot` `browser_click` `browser_fill` `browser_extract` `browser_scrape_structured` `browser_close`
 
 Full Playwright session with persistent user profile support. Screenshots feed directly into vision analysis.
 
@@ -154,8 +155,8 @@ Full Playwright session with persistent user profile support. Screenshots feed d
 `shell_run` — Shell command, cwd defaults to workspace  
 `powershell_run` — Windows-native PowerShell execution
 
-### Agents (7)
-`agents_create` `agents_spawn` `agents_result` `agents_await_all` `agents_list` `agents_prepare` `workers_spawn`
+### Agents (6)
+`agents_create` `agents_spawn` `agents_result` `agents_await_all` `agents_list` `agents_prepare`
 
 Spawn named catalog agents or ephemeral workers. Parallel execution via asyncio.
 
@@ -180,9 +181,10 @@ Spawn named catalog agents or ephemeral workers. Parallel execution via asyncio.
 ### Scheduler (3)
 `scheduler_add` `scheduler_list` `scheduler_delete` — cron and heartbeat job management
 
-### Documents (2)
+### Documents (3)
 `documents_read_pdf` — PDF text extraction with page range support  
-`documents_read_docx` — Word document extraction with heading structure
+`documents_read_docx` — Word document extraction with heading structure  
+`documents_read_csv` — CSV and Excel (.xlsx) reading with row limits
 
 ### Notebook (2)
 `notebook_read` `notebook_edit` — Jupyter `.ipynb` read and cell editing
@@ -197,6 +199,11 @@ Spawn named catalog agents or ephemeral workers. Parallel execution via asyncio.
 ### System (2)
 `system_info` — CPU, memory, disk, processes  
 `profile_switch` — Switch active personality profile
+
+### Planning, Skills & MCP (3)
+`todo_write` — Checklist for multi-step work  
+`skill_load` — Load a packaged skill's instructions on demand  
+`mcp_search` — Find and load tools from connected MCP servers on demand
 
 ---
 
@@ -297,7 +304,7 @@ Desktop WebSocket / CLI / Telegram
          ↓
     LLM  (OpenRouter → any provider)
          ↓
-  tool_gate → tool registry → 55 tools / MCP servers
+  tool_gate → tool registry → 61 tools / MCP servers
                                     ↓
                           task pool → catalog agents (parallel)
 ```

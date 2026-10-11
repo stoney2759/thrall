@@ -54,3 +54,9 @@ dashboard/.claude/
 Thumbs.db
 .vscode/
 .idea/
+# Local placeholders for planned features (kept on disk, not published)
+server/adapter.py
+utils/
+transports/discord/
+transports/slack/
+services/memory/backends/postgres.py

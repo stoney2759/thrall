@@ -12,8 +12,6 @@ playwright
 
 # LLM providers
 openai
-anthropic
-google-generativeai
 
 # MCP servers (client)
 mcp
