@@ -470,6 +470,13 @@ def _track_file_access(
             server_read_at[server] = iteration
 
 
+def _path_exists(path: str) -> bool:
+    """Tool paths are relative to the workspace unless absolute."""
+    if os.path.isabs(path):
+        return os.path.exists(path)
+    return os.path.exists(os.path.join(state.get_workspace_dir() or "", path))
+
+
 def _verify_problems(
     session_id, tools_called: set[str],
     written_at: dict[str, tuple[int, str]], read_at: dict[str, int], server_read_at: dict[str, int],
@@ -482,6 +489,9 @@ def _verify_problems(
             continue
         # A later inspection by the same MCP app that saved the file also counts (it holds the document open)
         if server and server_read_at.get(server, -1) > wrote:
+            continue
+        # Written then deleted in the same turn (e.g. a test folder cleaned up) — nothing left to re-read
+        if not _path_exists(path):
             continue
         unchecked.append(path)
     if unchecked:
@@ -519,14 +529,19 @@ async def _check_permission(message: Message, tool: str, args: dict) -> str | No
     if message.transport == Transport.SCHEDULER or not ask_user_channel.has_sender(message.session_id):
         return (f"PERMISSION DENIED: {tool} needs the user's approval and nobody is attached to approve it "
                 f"(add an allow rule in config [permissions] to run it unattended). Report this to the user.")
+    every_time = permissions.always_confirm(tool, args)  # restarts: no "always", asked every time
     async with permissions.ask_lock(message.session_id):
         # an earlier question in this batch may have granted "always" for this tool
-        if any(permissions.rule_matches(r, tool, args) for r in permissions.session_allows(message.session_id)):
+        if not every_time and any(permissions.rule_matches(r, tool, args)
+                                  for r in permissions.session_allows(message.session_id)):
             return None
+        choices = [c for c in PERMISSION_CHOICES if not (every_time and c == "always")]
         reply = await ask_user_channel.ask(message.session_id, permissions.prompt_text(tool, args),
                                            timeout_seconds=PERMISSION_ASK_TIMEOUT_SECONDS,
-                                           choices=list(PERMISSION_CHOICES))
+                                           choices=choices)
         answer = permissions.parse_answer(reply)
+        if every_time and answer == "always":
+            answer = "yes"
         await ask_user_channel.resolve(message.session_id, permissions.outcome_text(tool, answer, reply))
     logger.info("Permission %s for %s in session %s", answer, tool, message.session_id)
     if answer == "always":

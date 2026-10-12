@@ -81,6 +81,7 @@ When a task involves multiple items (races, files, URLs, pages), process them **
 
 ## System
 - `system_info` — return OS, CPU, memory, disk, and uptime
+- `thrall_restart` — restart Thrall itself (always asks the user first); make no tool calls after it
 
 ## Profile
 - `profile_switch` — switch the active personality profile

@@ -5,8 +5,7 @@ import time
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
 from thrall.tools.filesystem._resolve import resolve, is_protected
-
-_MAX_ROWS = 500
+from constants.documents import CSV_MAX_ROWS as _MAX_ROWS
 
 
 def execute(call: ToolCall) -> ToolResult:
@@ -40,13 +39,13 @@ def execute(call: ToolCall) -> ToolResult:
         reader = csv.DictReader(io.StringIO(text))
         headers = reader.fieldnames or []
         rows = []
-        for i, row in enumerate(reader):
-            if i >= max_rows:
-                break
-            rows.append(row)
+        total_rows = 0
+        for row in reader:
+            total_rows += 1
+            if len(rows) < max_rows:
+                rows.append(row)
 
-        total_rows = i + 1 if rows else 0
-        truncated = total_rows >= max_rows
+        truncated = total_rows > len(rows)
 
         lines = []
         if include_header and headers:
@@ -58,9 +57,9 @@ def execute(call: ToolCall) -> ToolResult:
 
         output = "\n".join(lines)
         if truncated:
-            output += f"\n\n[truncated at {max_rows} rows — file may contain more]"
+            output += f"\n\n[truncated — showing {len(rows)} of {total_rows} rows]"
 
-        header = f"[CSV: {path.name} | {len(headers)} columns, {total_rows} rows shown]\n\n"
+        header = f"[CSV: {path.name} | {len(headers)} columns, {total_rows} rows total, {len(rows)} shown]\n\n"
         return _result(call.id, output=header + output, start=start)
 
     except PermissionError:

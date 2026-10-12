@@ -19,18 +19,20 @@ def execute(call: ToolCall) -> ToolResult:
             resolved_a, resolved_b = resolve(path_a), resolve(path_b)
             if is_protected(resolved_a) or is_protected(resolved_b):
                 return _result(call.id, error="file not found", start=start)
-            a_lines = resolved_a.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
-            b_lines = resolved_b.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+            a_lines = resolved_a.read_text(encoding="utf-8", errors="replace").splitlines()
+            b_lines = resolved_b.read_text(encoding="utf-8", errors="replace").splitlines()
             label_a, label_b = path_a, path_b
         elif text_a and text_b:
-            a_lines = (text_a + "\n").splitlines(keepends=True)
-            b_lines = (text_b + "\n").splitlines(keepends=True)
+            a_lines = text_a.splitlines()
+            b_lines = text_b.splitlines()
             label_a, label_b = "a", "b"
         else:
             return _result(call.id, error="provide path_a+path_b or text_a+text_b", start=start)
 
-        diff = list(difflib.unified_diff(a_lines, b_lines, fromfile=label_a, tofile=label_b, n=context))
-        output = "".join(diff) if diff else "no differences"
+        # Lines without their endings, joined with "\n": a last line with no trailing newline
+        # would otherwise run into the next diff line ("-gamma+gamma").
+        diff = list(difflib.unified_diff(a_lines, b_lines, fromfile=label_a, tofile=label_b, n=context, lineterm=""))
+        output = "\n".join(diff) if diff else "no differences"
         return _result(call.id, output=output, start=start)
 
     except FileNotFoundError as e:

@@ -37,6 +37,16 @@ READ_WORDS = frozenset({"read", "cat", "stat", "ls", "tree", "find", "grep", "gl
 # Changes too small or self-contained to ask about (Thrall's own memory and clipboard)
 SAFE_CHANGE_TOOLS = frozenset({"memory_write", "clipboard_save", "clipboard_write"})
 
+# Restarting Thrall always asks the user — even in trusted mode, and an earlier "always" doesn't cover it
+ALWAYS_CONFIRM_TOOLS = frozenset({"thrall_restart"})
+# A shell command restarts Thrall when it names a restart script, or names Thrall's launcher AND stops or
+# starts a process (live 2026-10-12: Thrall wrote self-restart.ps1 and launched it detached via WMI)
+SELF_RESTART_SCRIPTS = ("self-restart", "restart_helper", "restart-thrall", "restart_thrall")
+SELF_RESTART_TARGETS = ("thrall.py",)
+SELF_RESTART_ACTIONS = ("stop-process", "taskkill", "kill ", "kill(", "pkill", "start-process", "win32_process",
+                        "popen", "start ", "& ", "python", "terminate")
+SHELL_TOOLS = frozenset({"shell_run", "powershell_run", "code_execute"})
+
 # Asking the user
 PERMISSION_ASK_TIMEOUT_SECONDS = 300
 PERMISSION_YES = frozenset({"y", "yes", "ok", "okay", "allow", "approve", "approved", "go", "sure", "yep", "yeah"})
@@ -45,6 +55,8 @@ PERMISSION_PROMPT = (
     "🔐 Thrall wants to run {tool}{detail}\n"
     "Reply yes, no, or always (always = allow {scope} for the rest of this session)."
 )
+# Restart prompts offer no "always" (see ALWAYS_CONFIRM_TOOLS)
+PERMISSION_PROMPT_ONCE = "🔐 Thrall wants to run {tool}{detail}\nReply yes or no — restarts are confirmed every time."
 PERMISSION_DETAIL_MAX = 200   # chars of the command/path shown in the prompt
 # Tap-able answers (Telegram buttons); the value is what parse_answer receives
 PERMISSION_CHOICES = ("yes", "always", "no")

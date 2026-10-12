@@ -15,7 +15,9 @@ def execute(call: ToolCall) -> ToolResult:
     kind = call.args.get("type", "any")          # "file" | "dir" | "any"
     min_size = call.args.get("min_size", None)    # bytes
     max_size = call.args.get("max_size", None)    # bytes
-    extension = call.args.get("extension", "")   # e.g. ".py"
+    extension = call.args.get("extension", "")   # e.g. ".py" — "py" works too
+    if extension and not extension.startswith("."):
+        extension = "." + extension
     limit = call.args.get("limit", _MAX_RESULTS)
 
     try:

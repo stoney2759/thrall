@@ -137,7 +137,7 @@ Open `http://localhost:8000` to access the webapp. Logs are in `logs/` (`thrall.
 
 ---
 
-## Tools (61)
+## Tools (62)
 
 ### Filesystem (12)
 `filesystem_read` `filesystem_write` `filesystem_edit` `filesystem_append` `filesystem_glob` `filesystem_grep` `filesystem_find` `filesystem_cat` `filesystem_ls` `filesystem_tree` `filesystem_stat` `filesystem_diff`
@@ -196,9 +196,10 @@ Spawn named catalog agents or ephemeral workers. Parallel execution via asyncio.
 `interaction_ask_user` — Blocking user prompt, waits for reply  
 `interaction_monitor` — Run command and collect output, stops at pattern match or timeout
 
-### System (2)
+### System (3)
 `system_info` — CPU, memory, disk, processes  
-`profile_switch` — Switch active personality profile
+`profile_switch` — Switch active personality profile  
+`thrall_restart` — Restart Thrall itself; always asks you to confirm first, even in trusted mode
 
 ### Planning, Skills & MCP (3)
 `todo_write` — Checklist for multi-step work  
@@ -304,7 +305,7 @@ Desktop WebSocket / CLI / Telegram
          ↓
     LLM  (OpenRouter → any provider)
          ↓
-  tool_gate → tool registry → 61 tools / MCP servers
+  tool_gate → tool registry → 62 tools / MCP servers
                                     ↓
                           task pool → catalog agents (parallel)
 ```

@@ -19,7 +19,7 @@ from thrall.tools.shell import powershell as powershell_run
 from thrall.tools.scheduler import add as sched_add, list as sched_list, delete as sched_delete
 from thrall.tools.git import run as git_run
 from thrall.tools.clipboard import read as clip_read, write as clip_write, save as clip_save, load as clip_load, snippets as clip_snippets
-from thrall.tools.system import info as sys_info
+from thrall.tools.system import info as sys_info, restart as thrall_restart
 from thrall.tools.documents import read_pdf as doc_read_pdf, read_docx as doc_read_docx, read_csv as doc_read_csv
 from thrall.tools.browser import navigate as browser_navigate, screenshot as browser_screenshot, click as browser_click, fill as browser_fill, extract as browser_extract, close as browser_close, scrape_structured as browser_scrape_structured
 from thrall.tools.audio import generate as audio_generate
@@ -76,6 +76,7 @@ _TOOLS: dict = {
     clip_load.NAME: clip_load.execute,
     clip_snippets.NAME: clip_snippets.execute,
     sys_info.NAME: sys_info.execute,
+    thrall_restart.NAME: thrall_restart.execute,
     doc_read_pdf.NAME: doc_read_pdf.execute,
     doc_read_docx.NAME: doc_read_docx.execute,
     doc_read_csv.NAME: doc_read_csv.execute,
@@ -140,6 +141,7 @@ _SCHEMAS: dict = {
     clip_load.NAME: (clip_load.DESCRIPTION, clip_load.PARAMETERS),
     clip_snippets.NAME: (clip_snippets.DESCRIPTION, clip_snippets.PARAMETERS),
     sys_info.NAME: (sys_info.DESCRIPTION, sys_info.PARAMETERS),
+    thrall_restart.NAME: (thrall_restart.DESCRIPTION, thrall_restart.PARAMETERS),
     doc_read_pdf.NAME: (doc_read_pdf.DESCRIPTION, doc_read_pdf.PARAMETERS),
     doc_read_docx.NAME: (doc_read_docx.DESCRIPTION, doc_read_docx.PARAMETERS),
     doc_read_csv.NAME: (doc_read_csv.DESCRIPTION, doc_read_csv.PARAMETERS),
@@ -210,12 +212,14 @@ def search_mcp(query: str, limit: int) -> list[str]:
         return [n for n in wanted if n in _MCP_TOOLS][:limit]
     terms = [t for t in query.lower().replace("_", " ").split() if t]
     servers = mcp_servers()
+    has_task_terms = any(t not in servers for t in terms)
     scored: list[tuple[int, str]] = []
     for name, tool_def in _MCP_TOOLS.items():
         server, _, short = name.partition("__")
         short_l = short.lower().replace("_", " ")
         desc_l = (tool_def["function"].get("description") or "").lower()
         score = 0
+        task_hit = False
         for t in terms:
             if t in servers:
                 if t == server.lower():
@@ -223,8 +227,13 @@ def search_mcp(query: str, limit: int) -> list[str]:
                 continue
             if t in short_l:
                 score += 3
+                task_hit = True
             elif t in desc_l:
                 score += 1
+                task_hit = True
+        # "rea dotnet": a server match alone must not load that server's tools in alphabetical order
+        if has_task_terms and not task_hit:
+            continue
         if score > 0:
             scored.append((score, name))
     scored.sort(key=lambda s: (-s[0], s[1]))

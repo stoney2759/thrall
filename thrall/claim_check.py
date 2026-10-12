@@ -84,7 +84,8 @@ def missing_paths(reply: str, user_text: str, written: set[str], roots: list[Pat
         key = normalise(path)
         if user_norm and key in user_norm:
             continue  # the user named it — Thrall may be saying it doesn't exist
-        if any(w == key or w.endswith(os.sep + key) for w in written):
+        # Either form may be the longer one: written "vtest\one.txt", reply "workspace\vtest\one.txt"
+        if any(w == key or w.endswith(os.sep + key) or key.endswith(os.sep + w) for w in written):
             continue
         candidate = Path(path)
         if candidate.is_absolute():

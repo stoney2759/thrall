@@ -1,32 +1,29 @@
 ﻿from __future__ import annotations
 import asyncio
+import os
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
 from uuid import UUID
+from bootstrap import state
 from schemas.tool import ToolCall, ToolResult
-from constants.tools import MAX_OUTPUT
+from constants.tools import MAX_OUTPUT, CODE_EXECUTE_DEFAULT_TIMEOUT
+from thrall.tools.shell.process import run_with_timeout
 
-_DEFAULT_TIMEOUT = 30
 
-
-def _run_sync(tmp_path: str, timeout: int) -> tuple[int, str, str]:
-    result = subprocess.run(
-        [sys.executable, tmp_path],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-    return result.returncode, result.stdout, result.stderr
+def _run_sync(tmp_path: str, cwd: str | None, timeout: int) -> tuple[int, str, str]:
+    """Runs in the workspace, like shell_run, so relative paths land in the same place."""
+    return run_with_timeout([sys.executable, tmp_path], shell=False, cwd=cwd, timeout=timeout, env=os.environ.copy())
 
 
 async def execute(call: ToolCall) -> ToolResult:
     start = time.monotonic()
     code = call.args.get("code", "")
     language = call.args.get("language", "python")
-    timeout = int(call.args.get("timeout", _DEFAULT_TIMEOUT))
+    timeout = int(call.args.get("timeout", CODE_EXECUTE_DEFAULT_TIMEOUT))
+    cwd = state.get_workspace_dir() or None
 
     if language != "python":
         return _result(call.id, error=f"unsupported language: {language}", start=start)
@@ -37,7 +34,7 @@ async def execute(call: ToolCall) -> ToolResult:
             tmp_path = f.name
 
         try:
-            returncode, out, err = await asyncio.to_thread(_run_sync, tmp_path, timeout)
+            returncode, out, err = await asyncio.to_thread(_run_sync, tmp_path, cwd, timeout)
         except subprocess.TimeoutExpired:
             return _result(call.id, error=f"execution timed out after {timeout}s", start=start)
         finally:
@@ -58,7 +55,7 @@ def _result(call_id: UUID, start: float, output: str | None = None, error: str |
 
 
 NAME = "code_execute"
-DESCRIPTION = "Execute Python code in a subprocess sandbox. Output is captured and returned."
+DESCRIPTION = "Execute Python code in a subprocess sandbox. Output is captured and returned. Runs in the workspace directory, so relative paths resolve there."
 PARAMETERS = {
     "code": {"type": "string", "required": True},
     "language": {"type": "string", "required": False, "default": "python"},

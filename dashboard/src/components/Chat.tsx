@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Send, RotateCcw, Plus, Paperclip, X, Link2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -98,6 +98,33 @@ function renderUserContent(content: string) {
   }
   return parts.length > 0 ? parts : <ReactMarkdown remarkPlugins={[remarkGfm]} components={USER_MD_COMPONENTS}>{content}</ReactMarkdown>;
 }
+
+type ChatMessage = ReturnType<typeof useStore.getState>['messages'][number];
+type MdComponents = React.ComponentProps<typeof ReactMarkdown>['components'];
+
+/** One message. Memoised so typing in the input and the working timer never re-render the markdown. */
+const MessageItem = memo(function MessageItem({ msg, mdComponents }: { msg: ChatMessage; mdComponents: MdComponents }) {
+  return msg.role === 'user' ? (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="text-xs text-muted px-1 select-none">You</span>
+      <div className="bg-elevated rounded-2xl rounded-tr-md px-4 py-2.5 text-primary text-sm max-w-xl break-words">
+        {renderUserContent(msg.content)}
+      </div>
+    </div>
+  ) : (
+    <div className="flex items-start gap-3">
+      <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <span className="text-xs font-bold text-accent select-none">T</span>
+      </div>
+      <div className="flex flex-col flex-1 min-w-0">
+        <span className="text-xs text-accent font-medium mb-1 select-none">Thrall</span>
+        <div className="prose-thrall text-primary text-sm leading-relaxed">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{msg.content}</ReactMarkdown>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 const EXT_TO_LANG: Record<string, string> = {
   py: 'python', js: 'javascript', ts: 'typescript',
@@ -230,6 +257,10 @@ export default function Chat({ onSend, typing, progress }: Props) {
     } catch { /* ignore */ }
   }, [input, activeSessionId]);
 
+  // Read through a ref so mdComponents stays stable and memoised messages don't re-render
+  const onSendRef = useRef(onSend);
+  useEffect(() => { onSendRef.current = onSend; }, [onSend]);
+
   // /approve button — replaces the paragraph in assistant messages
   const mdComponents = useMemo(() => ({
     p({ children }: { children?: React.ReactNode }) {
@@ -240,7 +271,7 @@ export default function Chat({ onSend, typing, progress }: Props) {
       if (text === '/approve') {
         return (
           <button
-            onClick={() => onSend('/approve')}
+            onClick={() => onSendRef.current('/approve')}
             className="mt-2 inline-flex items-center px-3 py-1.5 rounded-lg bg-accent/20 text-accent border border-accent/30 text-xs font-mono hover:bg-accent/30 active:scale-95 transition-all cursor-pointer"
           >
             /approve
@@ -283,7 +314,7 @@ export default function Chat({ onSend, typing, progress }: Props) {
     td: ({ children }: { children?: React.ReactNode }) => (
       <td className="border border-border px-2 py-1">{children}</td>
     ),
-  }), [onSend]);
+  }), []);
 
   useEffect(() => {
     fetch('/api/commands')
@@ -512,28 +543,9 @@ export default function Chat({ onSend, typing, progress }: Props) {
           </div>
         ) : (
           <div className="space-y-6 max-w-3xl mx-auto">
-            {messages.map((msg) =>
-              msg.role === 'user' ? (
-                <div key={msg.id} className="flex flex-col items-end gap-0.5">
-                  <span className="text-xs text-muted px-1 select-none">You</span>
-                  <div className="bg-elevated rounded-2xl rounded-tr-md px-4 py-2.5 text-primary text-sm max-w-xl break-words">
-                    {renderUserContent(msg.content)}
-                  </div>
-                </div>
-              ) : (
-                <div key={msg.id} className="flex items-start gap-3">
-                  <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-accent select-none">T</span>
-                  </div>
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <span className="text-xs text-accent font-medium mb-1 select-none">Thrall</span>
-                    <div className="prose-thrall text-primary text-sm leading-relaxed">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{msg.content}</ReactMarkdown>
-                    </div>
-                  </div>
-                </div>
-              ),
-            )}
+            {messages.map((msg) => (
+              <MessageItem key={msg.id} msg={msg} mdComponents={mdComponents} />
+            ))}
 
             {typing && (
               <div className="flex items-start gap-3">

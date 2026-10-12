@@ -55,6 +55,12 @@ class TestPaths:
         written = {claim_check.normalise(str(tmp_path / "gone.txt"))}
         assert claim_check.missing_paths(f"wrote `{tmp_path / 'gone.txt'}`", "", written, [tmp_path]) == []
 
+    def test_written_relative_named_with_workspace_prefix(self, tmp_path):
+        """Written as vtest/one.txt (then deleted); the reply names it workspace/vtest/one.txt."""
+        written = {claim_check.normalise("vtest/one.txt")}
+        reply = "deleted `workspace/vtest/one.txt` as planned"
+        assert claim_check.missing_paths(reply, "", written, [tmp_path]) == []
+
     def test_urls_and_bare_filenames_ignored(self):
         assert claim_check.extract_paths("see https://x.com/a.png and `badge.svg`") == []
 

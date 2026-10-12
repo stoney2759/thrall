@@ -17,11 +17,13 @@ from constants.permissions import (
     MODE_ASK, MODE_TRUSTED, MODE_READ_ONLY, PERMISSION_MODES, DEFAULT_PERMISSION_MODE,
     RISK_READ, RISK_CHANGE, RISK_DANGEROUS, DECISION_ALLOW, DECISION_DENY, DECISION_ASK,
     DANGEROUS_TOOLS, DANGEROUS_WORDS, READ_TOOLS, READ_WORDS, SAFE_CHANGE_TOOLS,
-    PERMISSION_YES, PERMISSION_ALWAYS, PERMISSION_PROMPT, PERMISSION_DETAIL_MAX, PERMISSION_OUTCOME,
+    ALWAYS_CONFIRM_TOOLS, SELF_RESTART_SCRIPTS, SELF_RESTART_TARGETS, SELF_RESTART_ACTIONS, SHELL_TOOLS,
+    PERMISSION_YES, PERMISSION_ALWAYS, PERMISSION_PROMPT, PERMISSION_PROMPT_ONCE, PERMISSION_DETAIL_MAX,
+    PERMISSION_OUTCOME,
 )
 
 # Argument that a rule's ":arg_glob" part is matched against, in order of preference
-_PRIMARY_ARGS = ("command", "cmd", "code", "path", "file_path", "url", "name", "query", "brief")
+_PRIMARY_ARGS = ("command", "cmd", "code", "path", "file_path", "url", "name", "query", "brief", "reason")
 _CHANGE_WORDS = frozenset({"write", "edit", "append", "save", "export", "create", "new", "add", "set", "update",
                            "apply", "run", "execute", "draw", "type", "move", "rename", "copy", "insert", "generate",
                            "download", "install", "click", "fill", "navigate", "switch", "import"})
@@ -85,11 +87,26 @@ def decide(tool: str, args: dict, mode: str, allow: list[str], deny: list[str],
         return DECISION_ALLOW, "read-only"
     if mode == MODE_READ_ONLY:
         return DECISION_DENY, "read-only mode — nothing that changes anything can run"
+    if always_confirm(tool, args):
+        return DECISION_ASK, "restarts Thrall — always confirmed with the user"
     if mode == MODE_TRUSTED:
         return DECISION_ALLOW, "trusted mode"
     if any(rule_matches(r, tool, args) for r in allow + session_allow):
         return DECISION_ALLOW, "matches an allow rule"
     return DECISION_ASK, f"{risk} action in ask mode"
+
+
+def always_confirm(tool: str, args: dict) -> bool:
+    """True for calls that must ask the user every time, whatever the mode or earlier answers:
+    thrall_restart, and shell commands that stop or launch Thrall itself."""
+    if tool in ALWAYS_CONFIRM_TOOLS:
+        return True
+    if tool not in SHELL_TOOLS:
+        return False
+    text = " ".join(str(args.get(k, "")) for k in ("command", "code")).lower()
+    if any(s in text for s in SELF_RESTART_SCRIPTS):
+        return True
+    return any(t in text for t in SELF_RESTART_TARGETS) and any(a in text for a in SELF_RESTART_ACTIONS)
 
 
 def always_scope(tool: str) -> str:
@@ -102,6 +119,8 @@ def prompt_text(tool: str, args: dict) -> str:
     detail = primary_arg(args)
     if len(detail) > PERMISSION_DETAIL_MAX:
         detail = detail[:PERMISSION_DETAIL_MAX] + "…"
+    if always_confirm(tool, args):
+        return PERMISSION_PROMPT_ONCE.format(tool=tool, detail=f": {detail}" if detail else "")
     scope = always_scope(tool)
     scope_label = f"every {scope[:-3]} tool" if scope.endswith("__*") else scope
     return PERMISSION_PROMPT.format(tool=tool, detail=f": {detail}" if detail else "", scope=scope_label)

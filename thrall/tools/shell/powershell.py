@@ -7,21 +7,12 @@ import time
 from uuid import UUID
 from bootstrap import state
 from schemas.tool import ToolCall, ToolResult
-from constants.tools import MAX_OUTPUT
-
-_DEFAULT_TIMEOUT = 300
+from constants.tools import MAX_OUTPUT, SHELL_DEFAULT_TIMEOUT
+from thrall.tools.shell.process import run_with_timeout
 
 
 def _run_sync(command: str, cwd: str | None, timeout: int, env: dict) -> tuple[int, str, str]:
-    result = subprocess.run(
-        ["powershell", "-NoProfile", "-Command", command],
-        capture_output=True,
-        text=True,
-        cwd=cwd,
-        timeout=timeout,
-        env=env,
-    )
-    return result.returncode, result.stdout, result.stderr
+    return run_with_timeout(["powershell", "-NoProfile", "-Command", command], shell=False, cwd=cwd, timeout=timeout, env=env)
 
 
 async def execute(call: ToolCall) -> ToolResult:
@@ -33,7 +24,7 @@ async def execute(call: ToolCall) -> ToolResult:
         cwd = os.path.join(workspace, _cwd) if workspace else _cwd
     else:
         cwd = _cwd or workspace or None
-    timeout = int(call.args.get("timeout", _DEFAULT_TIMEOUT))
+    timeout = int(call.args.get("timeout", SHELL_DEFAULT_TIMEOUT))
 
     if not command:
         return _result(call.id, error="command is required", start=start)
@@ -46,7 +37,7 @@ async def execute(call: ToolCall) -> ToolResult:
     try:
         returncode, out, err = await asyncio.to_thread(_run_sync, command, cwd, timeout, env)
     except subprocess.TimeoutExpired:
-        return _result(call.id, error=f"timed out after {timeout}s", start=start)
+        return _result(call.id, error=f"timed out after {timeout}s — the command and every process it started were killed", start=start)
     except Exception as e:
         return _result(call.id, error=str(e), start=start)
 

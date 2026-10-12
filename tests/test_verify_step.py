@@ -12,6 +12,13 @@ from constants.tools import TODO_MAX_ITEMS
 from constants.claims import UNVERIFIED_PREFIX
 
 PATH = r"C:\tmp\eggs.xlsx"
+_REAL_PATH_EXISTS = coordinator._path_exists
+
+
+@pytest.fixture(autouse=True)
+def written_files_exist(monkeypatch):
+    """PATH is never really written in these tests — treat it as present unless a test says otherwise."""
+    monkeypatch.setattr(coordinator, "_path_exists", lambda path: True)
 
 
 def _todo_call(sid, items) -> ToolCall:
@@ -90,6 +97,18 @@ class TestVerifyProblems:
         assert coordinator._verify_problems(uuid4(), set(), w, r, s)
         coordinator._track_file_access("gridcraft__read_range", {"range": "A1:B9"}, 2, w, r, s)
         assert coordinator._verify_problems(uuid4(), set(), w, r, s) == []
+
+    def test_written_then_deleted_is_not_flagged(self, monkeypatch, tmp_path):
+        """A test folder written and cleaned up in the same turn has nothing left to re-read."""
+        from bootstrap import state
+        monkeypatch.setattr(coordinator, "_path_exists", _REAL_PATH_EXISTS)
+        monkeypatch.setattr(state, "get_workspace_dir", lambda: str(tmp_path))
+        (tmp_path / "kept.txt").write_text("x")
+        w, r, s = {}, {}, {}
+        coordinator._track_file_access("filesystem_write", {"path": "kept.txt"}, 0, w, r, s)
+        coordinator._track_file_access("filesystem_write", {"path": "gone.txt"}, 0, w, r, s)
+        problems = coordinator._verify_problems(uuid4(), set(), w, r, s)
+        assert problems and "kept.txt" in problems[0] and "gone.txt" not in problems[0]
 
     def test_unfinished_checklist_only_flagged_when_used_this_turn(self):
         sid = uuid4()

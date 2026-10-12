@@ -8,6 +8,14 @@ MCP_IDLE_TURNS = 15              # unload an MCP tool after this many user turns
 MCP_CATALOG_SAMPLE_TOOLS = 4     # example tool names shown per server in the context catalog
 MCP_OVERVIEW_SAMPLE_TOOLS = 12   # tool names shown when mcp_search is given only a server name
 
+# Shell tools (shell_run, powershell_run)
+SHELL_DEFAULT_TIMEOUT = 300      # seconds before the command and every process it started are killed
+SHELL_KILL_GRACE_SECONDS = 5     # after the tree kill, wait at most this long for leftover output
+CODE_EXECUTE_DEFAULT_TIMEOUT = 30  # seconds for code_execute
+
+# browser_screenshot save_path — new image files only
+SCREENSHOT_SAVE_EXTS = frozenset({".png", ".jpg", ".jpeg"})
+
 # In-task checklist (todo_write)
 TODO_MAX_ITEMS = 30              # items beyond this are rejected — split the task instead
 
