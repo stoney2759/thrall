@@ -25,6 +25,7 @@ from constants.coordinator import (
     MAX_TOOL_ITERATIONS, AUTO_COMPACT_COOLDOWN_SECONDS, MAX_TOOL_RESULT_IN_CONTEXT,
     INTERJECTION_ACK, INTERJECTION_PREFIX,
     VERIFY_MAX_RETRIES, VERIFY_WRITE_WORDS, VERIFY_READ_WORDS, VERIFY_PATH_ARGS,
+    PREFLIGHT_DEFAULT_CEILING,
 )
 from schemas.memory import TodoStatus
 from thrall.tools.todo.write import NAME as TODO_TOOL
@@ -203,8 +204,7 @@ async def _reason(
         # every LLM call. If it's over 50% of the ceiling, prune aggressively.
         # This fires regardless of execution mode so it catches the very first
         # large tool result (e.g. a huge browser page) before it hits the API.
-        _pre_ceiling = token_ceiling or int(state.get_config().get("execution_mode", {}).get("token_ceiling", 400000))
-        _pre_threshold = _pre_ceiling // 2
+        _pre_threshold = preflight_ceiling(token_ceiling, state.get_config()) // 2
         _pre_est = _estimate_messages_tokens(messages)
         if _pre_est >= _pre_threshold:
             _keep = 20
@@ -596,6 +596,14 @@ def _tool_result_message(tool_call_id: str, content: str) -> dict:
         "tool_call_id": tool_call_id,
         "content": content,
     }
+
+
+def preflight_ceiling(token_ceiling: int, config: dict) -> int:
+    """Token ceiling that pre-flight pruning measures against. A ceiling of 0 means unlimited, so it
+    falls back to the default instead of becoming 0 — a 0 ceiling pruned every tool result once a
+    task passed ~20 tool calls."""
+    configured = int(config.get("execution_mode", {}).get("token_ceiling", 0) or 0)
+    return token_ceiling or configured or PREFLIGHT_DEFAULT_CEILING
 
 
 def _estimate_messages_tokens(messages: list[dict]) -> int:
