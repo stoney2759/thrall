@@ -4,7 +4,7 @@ import inspect
 import logging
 from uuid import UUID
 from schemas.tool import ToolCall, ToolResult
-from constants.tools import PROVIDER_TOOL_LIMIT, MCP_CATALOG_SAMPLE_TOOLS
+from constants.tools import PROVIDER_TOOL_LIMIT, MCP_CATALOG_SAMPLE_TOOLS, MCP_OVERVIEW_SAMPLE_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -200,14 +200,16 @@ def get_definitions(allowed: list[str] | None = None, loaded_mcp: list[str] | No
 def search_mcp(query: str, limit: int) -> list[str]:
     """Rank registered MCP tools against a query; returns up to `limit` tool names.
 
-    A query term matching a server name scores that server's tools; terms found in the tool's own
-    name score highest, then its description. `select:a,b` loads exact tool names.
+    A query term matching a server name scores that server's tools and nothing else (so "rea" does
+    not also match every tool named "read_..."); other terms found in the tool's own name score
+    highest, then its description. `select:a,b` loads exact tool names.
     """
     query = query.strip()
     if query.lower().startswith("select:"):
         wanted = [n.strip() for n in query[len("select:"):].split(",") if n.strip()]
         return [n for n in wanted if n in _MCP_TOOLS][:limit]
     terms = [t for t in query.lower().replace("_", " ").split() if t]
+    servers = mcp_servers()
     scored: list[tuple[int, str]] = []
     for name, tool_def in _MCP_TOOLS.items():
         server, _, short = name.partition("__")
@@ -215,8 +217,10 @@ def search_mcp(query: str, limit: int) -> list[str]:
         desc_l = (tool_def["function"].get("description") or "").lower()
         score = 0
         for t in terms:
-            if t == server.lower():
-                score += 2
+            if t in servers:
+                if t == server.lower():
+                    score += 2
+                continue
             if t in short_l:
                 score += 3
             elif t in desc_l:
@@ -239,6 +243,19 @@ def mcp_catalog() -> str:
         sample = ", ".join(shorts[:MCP_CATALOG_SAMPLE_TOOLS])
         lines.append(f"- {server}: {len(shorts)} tools (e.g. {sample})")
     return "\n".join(lines)
+
+
+def mcp_servers() -> set[str]:
+    """Lower-cased names of every connected MCP server."""
+    return {name.partition("__")[0].lower() for name in _MCP_TOOLS}
+
+
+def mcp_server_overview(server: str) -> str:
+    """Tool count plus names spread across the server's whole tool list — for a server-only search."""
+    shorts = sorted(name.partition("__")[2] for name in _MCP_TOOLS if name.partition("__")[0].lower() == server)
+    step = max(1, len(shorts) // MCP_OVERVIEW_SAMPLE_TOOLS)
+    sample = ", ".join(shorts[::step][:MCP_OVERVIEW_SAMPLE_TOOLS])
+    return f"- {server}: {len(shorts)} tools (e.g. {sample})"
 
 
 def mcp_tool_summary(name: str) -> str:

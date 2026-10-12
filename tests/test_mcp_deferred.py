@@ -80,6 +80,25 @@ class TestDeferredLoading:
         registry.register_mcp_tools([_mcp_def(f"bulk__tool_{i}", "bulk tool") for i in range(50)])
         assert len(registry.search_mcp("bulk", MCP_SEARCH_MAX_RESULTS)) == MCP_SEARCH_MAX_RESULTS
 
+    def test_server_name_does_not_match_inside_tool_names(self):
+        """'rea' is a server, so it must not also match every tool named 'read_...' on other servers."""
+        registry.register_mcp_tools([
+            _mcp_def("rea__binary_overview", "Summarise a native binary"),
+            _mcp_def("rea__read_bytes", "Read raw bytes"),
+            _mcp_def("github__read_file", "Read a file from a repository"),
+        ])
+        found = registry.search_mcp("rea binary", MCP_SEARCH_MAX_RESULTS)
+        assert found[0] == "rea__binary_overview"
+        assert "github__read_file" not in found
+
+    def test_server_only_query_gives_overview_and_loads_nothing(self):
+        registry.register_mcp_tools([_mcp_def(f"rea__read_{i}", "Read something") for i in range(20)])
+        sid = uuid4()
+        result = mcp_search.execute(_search_call(sid, "rea"))
+        assert "Nothing loaded" in result.output
+        assert "rea: 20 tools" in result.output
+        assert session_memory.get_loaded_mcp_tools(sid) == []
+
     def test_session_cap_drops_oldest(self):
         sid = uuid4()
         names = [f"bulk__tool_{i}" for i in range(MCP_SESSION_TOOL_CAP + 5)]

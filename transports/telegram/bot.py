@@ -1011,9 +1011,6 @@ async def _register_task_delivery(app: Application) -> None:
         from services import background_wake
         if getattr(task, "silent", False):
             return
-        if task.status == TaskStatus.DONE and task.result and task.profile and task.profile.name and task.profile.name != "default":
-            from thrall.tasks.continuation_store import save
-            save(task.profile.name, task.brief, task.result)
         # Hand the result to Thrall so it reasons and replies; raw post below is the fallback
         if background_wake.should_wake(task) and allowed:
             try:

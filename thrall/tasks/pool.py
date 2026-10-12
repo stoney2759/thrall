@@ -81,11 +81,23 @@ async def _run(worker: BaseTask) -> None:
         )
         _pool.pop(worker.id, None)
         state.decrement_tasks()
+        _save_continuation(t)
         for cb in _completion_callbacks:
             try:
                 await cb(worker.task)
             except Exception:
                 pass
+
+
+def _save_continuation(task: Task) -> None:
+    """Keep a named agent's finished work so its next spawn picks up where it left off.
+    Runs for every transport and for silent (notify=false) agents too."""
+    if task.status != TaskStatus.DONE or not task.result:
+        return
+    if not task.profile or not task.profile.name or task.profile.name == "default":
+        return
+    from thrall.tasks.continuation_store import save
+    save(task.profile.name, task.brief, task.result)
 
 
 def _build(task: Task) -> BaseTask:
